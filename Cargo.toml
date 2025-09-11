@@ -1,0 +1,12 @@
+[package]
+name = "oto"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alsa = "0.10.0"
+anyhow = "1.0.99"
+dsf = "0.2.2"
+ringbuf = "0.4.8"
+symphonia = { version = "0.5.4", features = ["aac"]}
+tokio = { version = "1.47.1", features = ["full"] }
