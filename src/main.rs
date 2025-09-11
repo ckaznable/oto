@@ -17,11 +17,11 @@ mod player;
 
 const I32_BYTE: usize = i32::BITS as usize / 8;
 
-// 8mb i32
-const TMP_BUF_ALLOC: usize = (1024 * 8) / I32_BYTE;
+// 256kb i32
+const TMP_BUF_ALLOC: usize = (1024 * 256) / I32_BYTE;
 
-// 16mb i32
-const RING_BUF_ALLOC: usize = (1024 * 16) / I32_BYTE;
+// 4mb i32
+const RING_BUF_ALLOC: usize = (1024 * 1024 * 4) / I32_BYTE;
 
 #[tokio::main]
 async fn main() -> Result<()> {
