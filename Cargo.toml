@@ -8,5 +8,11 @@ alsa = "0.10.0"
 anyhow = "1.0.99"
 dsf = "0.2.2"
 ringbuf = "0.4.8"
-symphonia = { version = "0.5.4", features = ["aac"]}
+symphonia = { version = "0.5.4", features = ["all-codecs"]}
 tokio = { version = "1.47.1", features = ["full"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
