@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 alsa = "0.10.0"
 anyhow = "1.0.99"
-dsf = "0.2.2"
+id3 = "1.16.3"
 ringbuf = "0.4.8"
 symphonia = { version = "0.5.4", features = ["all-codecs"]}
 tokio = { version = "1.47.1", features = ["full"] }

@@ -2,7 +2,11 @@ use std::{collections::VecDeque, path::PathBuf};
 
 use alsa::pcm::State;
 use anyhow::{anyhow, Result};
-use ringbuf::{storage::Heap, traits::{Consumer, Observer, Producer, Split}, LocalRb};
+use ringbuf::{
+    storage::Heap,
+    traits::{Consumer, Observer, Producer, Split},
+    LocalRb
+};
 use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::{
@@ -45,7 +49,29 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
 
     let mut player = Player::new(&device)?;
     player.init(spec)?;
-    let io = player.io_i32()?;
+    let io = player.io_i32();
+    let io_dsd = player.io_u32();
+
+    #[allow(clippy::type_complexity)]
+    let write_io: Box<dyn Fn(&[i32]) -> anyhow::Result<usize>> = Box::new(move |buf: &[i32]| {
+        match spec.mode {
+            media::OutputMode::PCM => {
+                let io = io.as_ref().unwrap();
+                Ok(io.writei(buf)? * channel)
+            },
+            media::OutputMode::DSD => {
+                let buf = unsafe {
+                    std::slice::from_raw_parts(
+                        buf.as_ptr() as *const u32,
+                        buf.len()
+                    )
+                };
+
+                let io = io_dsd.as_ref().unwrap();
+                Ok(io.writei(buf)? * channel)
+            },
+        }
+    });
 
     let mut eof = false;
 
@@ -58,8 +84,8 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
         // consume the last data in ring buffer
         if !cons.is_empty() {
             let (right, left) = cons.as_slices();
-            let wr = io.writei(right)? * channel;
-            let wl = io.writei(left)? * channel;
+            let wr = write_io(right)?;
+            let wl = write_io(left)?;
             cons.skip(wr + wl);
         }
 
@@ -84,8 +110,8 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
         match dm.decode(&mut temp_buf) {
             Ok(_) => {
                 let (right, left) = temp_buf.as_slices();
-                let wr = io.writei(right)? * channel;
-                let wl = io.writei(left)? * channel;
+                let wr = write_io(right)?;
+                let wl = write_io(left)?;
                 temp_buf.drain(..(wr + wl));
 
                 if !temp_buf.is_empty() {

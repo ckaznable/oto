@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum OutputMode {
     PCM,
     DSD,
@@ -10,7 +11,7 @@ pub struct Media {
     pub file_path: PathBuf,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MediaSpec {
     pub sample_rate: u32,
     pub channel: u32,

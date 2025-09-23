@@ -1,5 +1,8 @@
 use std::{
-    collections::VecDeque, fmt::Display, path::PathBuf
+    collections::VecDeque,
+    fmt::Display,
+    io::{Cursor, Read, Seek, SeekFrom},
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Result};
@@ -58,9 +61,24 @@ pub struct DecoderManager {
 
 impl DecoderManager {
     pub fn open(&mut self, p: PathBuf) -> Result<()> {
-        let file = std::fs::File::open(p)?;
-        self.decoder.replace(Box::new(PcmDecoder::new(file)?));
+        let mut file = std::fs::File::open(&p)?;
+        let is_dsd_file = Self::is_dsd_file(&mut file)?;
+        file.seek(std::io::SeekFrom::Start(0))?;
+
+        let decoder: Box<dyn Decoder> = if is_dsd_file {
+            Box::new(DsdReader::new(file)?)
+        } else {
+            Box::new(PcmDecoder::new(file, &p)?)
+        };
+
+        self.decoder.replace(decoder);
         Ok(())
+    }
+
+    fn is_dsd_file(r: &mut std::fs::File) -> Result<bool> {
+        let mut buf = [0u8; 4];
+        r.read_exact(&mut buf)?;
+        Ok(&buf == b"DSD ")
     }
 }
 
@@ -86,12 +104,17 @@ pub struct PcmDecoder {
 }
 
 impl PcmDecoder {
-    fn new(src: std::fs::File) -> Result<Self> {
+    fn new(src: std::fs::File, p: &Path) -> Result<Self> {
         // Create the media source stream.
         let mss = MediaSourceStream::new(Box::new(src), Default::default());
 
         // Create a probe hint using the file's extension. [Optional]
-        let hint = Hint::new();
+        let mut hint = Hint::new();
+        if let Some(ext) = p.extension() {
+            if let Some(ext) = ext.to_str() {
+                hint.with_extension(ext);
+            }
+        }
 
         // Use the default options for metadata and format readers.
         let meta_opts = MetadataOptions::default();
@@ -100,7 +123,7 @@ impl PcmDecoder {
         // Probe the media source.
         let probed = symphonia::default::get_probe()
             .format(&hint, mss, &fmt_opts, &meta_opts)
-            .map_err(|_| anyhow!("unsupported format"))?;
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         // Get the instantiated format reader.
         let format = probed.format;
@@ -208,3 +231,109 @@ impl Decoder for PcmDecoder {
     }
 }
 
+pub struct DsdReader {
+    spec: MediaSpec,
+    metadata: id3::Tag,
+    dsd_chunk_size: u64,
+    fmt_chunk_size: u64,
+    data_chunk_size: u64,
+    reader: std::fs::File,
+    size: u64,
+}
+
+impl DsdReader {
+    pub fn new(mut reader: std::fs::File) -> Result<Self> {
+        let mut u32_buf = [0u8; 4];
+        let mut u64_buf = [0u8; 8];
+        let mut dsd_chunk_size_buf = [0u8; 8];
+        let mut fmt_chunk_size_buf = [0u8; 8];
+        let mut data_chunk_size_buf = [0u8; 8];
+        let mut file_size_buf = [0u8; 8];
+        let mut metadata_pot_buf = [0u8; 8];
+        let mut channel_num_buf = [0u8; 4];
+        let mut sample_freq_buf =  [0u8; 4];
+
+        // 'DSD '
+        reader.read_exact(&mut u32_buf)?;
+        // size of dsd chunk
+        reader.read_exact(&mut dsd_chunk_size_buf)?;
+        // totol file size
+        reader.read_exact(&mut file_size_buf)?;
+        // pointer to metadata chunk
+        reader.read_exact(&mut metadata_pot_buf)?;
+        // 'fmt '
+        reader.read_exact(&mut u32_buf)?;
+        // size of fmt chunk
+        reader.read_exact(&mut fmt_chunk_size_buf)?;
+        // format version
+        reader.read_exact(&mut u32_buf)?;
+        // format id
+        reader.read_exact(&mut u32_buf)?;
+        // channel type
+        reader.read_exact(&mut u32_buf)?;
+        // channel num
+        reader.read_exact(&mut channel_num_buf)?;
+        // sampleling frequency
+        reader.read_exact(&mut sample_freq_buf)?;
+        // bit per sample
+        reader.read_exact(&mut u32_buf)?;
+        // sample count
+        reader.read_exact(&mut u64_buf)?;
+        // block size per channel
+        reader.read_exact(&mut u32_buf)?;
+        // reserved
+        reader.read_exact(&mut u32_buf)?;
+        // 'data'
+        reader.read_exact(&mut u32_buf)?;
+        // size of data chunk
+        reader.read_exact(&mut data_chunk_size_buf)?;
+
+        let metadata_pot = u64::from_le_bytes(metadata_pot_buf);
+        let dsd_chunk_size = u64::from_le_bytes(dsd_chunk_size_buf);
+        let fmt_chunk_size = u64::from_le_bytes(fmt_chunk_size_buf);
+        let data_chunk_size = u64::from_le_bytes(data_chunk_size_buf);
+        let file_size = u64::from_le_bytes(file_size_buf);
+        let dsd_size = dsd_chunk_size + fmt_chunk_size + data_chunk_size;
+        if dsd_size > file_size {
+            return Err(anyhow!("dsd file parser error"));
+        }
+
+        let metadata_size = file_size - dsd_size;
+        reader.seek(SeekFrom::Start(metadata_pot))?;
+
+        let mut metadata = vec![0u8; metadata_size as usize];
+        reader.read_exact(&mut metadata)?;
+
+        let metadata = id3::v1v2::read_from(Cursor::new(metadata))?;
+        let spec = MediaSpec {
+            sample_rate: u32::from_le_bytes(sample_freq_buf),
+            channel: u32::from_le_bytes(channel_num_buf),
+            mode: crate::media::OutputMode::DSD,
+        };
+
+        println!("{:?}", spec);
+
+        // reset reader to data position
+        reader.seek(SeekFrom::Start(dsd_chunk_size + fmt_chunk_size + 12))?;
+
+        Ok(Self {
+            spec,
+            metadata,
+            dsd_chunk_size,
+            fmt_chunk_size,
+            data_chunk_size,
+            reader,
+            size: file_size - 12,
+        })
+    }
+}
+
+impl Decoder for DsdReader {
+    fn decode(&mut self, _buf: &mut VecDeque<i32>) -> Result<(), DecoderError> {
+        todo!()
+    }
+
+    fn spec(&self) -> Option<MediaSpec> {
+        Some(self.spec)
+    }
+}

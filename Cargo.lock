@@ -124,16 +124,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
-name = "dsf"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20f4ff4c128f14b36300e5ae44abf881c33e8fc131c7c183cafdf7c2b09abecd"
-dependencies = [
- "id3",
- "sampled_data_duration",
-]
-
-[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -255,7 +245,7 @@ version = "0.1.0"
 dependencies = [
  "alsa",
  "anyhow",
- "dsf",
+ "id3",
  "ringbuf",
  "symphonia",
  "tokio",
@@ -354,12 +344,6 @@ name = "rustc-demangle"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56f7d92ca342cea22a06f2121d944b4fd82af56988c270852495420f961d4ace"
-
-[[package]]
-name = "sampled_data_duration"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1c52ae966a8693b8d564a1dee9f2139907c9e375ee9544276bf61b5d97841ce"
 
 [[package]]
 name = "scopeguard"
