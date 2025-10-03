@@ -1,23 +1,27 @@
-use std::{collections::VecDeque, path::PathBuf};
+use std::{cell::RefCell, collections::VecDeque, path::PathBuf, rc::Rc, sync::mpsc::{channel, Receiver}};
 
 use alsa::pcm::State;
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use ringbuf::{
     storage::Heap,
     traits::{Consumer, Observer, Producer, Split},
     LocalRb
 };
 use tokio::task::{spawn_blocking, JoinHandle};
+use walkdir::{DirEntry, WalkDir};
 
 use crate::{
-    decoder::{Decoder, DecoderError, DecoderManager},
-    player::Player
+    decoder::{Decoder, DecoderError, DecoderManager}, event::PlayerCommand, player::Player
 };
 
+mod cli;
 mod decoder;
 mod event;
 mod media;
 mod player;
+mod shared;
+mod store;
 
 const I32_BYTE: usize = i32::BITS as usize / 8;
 
@@ -29,15 +33,22 @@ const RING_BUF_ALLOC: usize = (1024 * 1024 * 4) / I32_BYTE;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    let path = args.get(1).expect("file path not provided").clone();
-    let device = args.get(2).expect("alsa device not provided").clone();
+    let args = cli::Args::parse();
 
-    let _player_handle: JoinHandle<Result<()>> = spawn_blocking(move || player(path, device));
-    _player_handle.await?
+    let (tx, rx) = channel();
+
+    match args.command {
+        cli::Commands::Play { path, device } => {
+            let _player_handle: JoinHandle<Result<()>> = spawn_blocking(move || player(path, device, rx));
+            _player_handle.await?
+        },
+        cli::Commands::PlayList { command } => {
+            todo!()
+        },
+    }
 }
 
-fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
+fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>) -> Result<()> {
     let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
     let (mut prod, mut cons) = rb.split();
     let mut temp_buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
@@ -47,17 +58,26 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
     let spec = dm.spec().ok_or(anyhow!("unknown codec"))?;
     let channel = spec.channel as usize;
 
-    let mut player = Player::new(&device)?;
+    let player = Player::new(&device)?;
     player.init(spec)?;
-    let io = player.io_i32();
-    let io_dsd = player.io_u32();
+    let io = Rc::new(RefCell::new(Some(player.io_i32())));
+    let io_dsd = Rc::new(RefCell::new(Some(player.io_u32())));
+
+    let spec = Rc::new(RefCell::new(spec));
+
+    let spec_in_fn = spec.clone();
+    let io_in_fn = io.clone();
+    let io_dsd_in_fn = io_dsd.clone();
 
     #[allow(clippy::type_complexity)]
     let write_io: Box<dyn Fn(&[i32]) -> anyhow::Result<usize>> = Box::new(move |buf: &[i32]| {
-        match spec.mode {
+        match spec_in_fn.borrow().mode {
             media::OutputMode::PCM => {
-                let io = io.as_ref().unwrap();
-                Ok(io.writei(buf)? * channel)
+                if let Some(Ok(io)) = &*io_in_fn.borrow() {
+                    Ok(io.writei(buf)? * channel)
+                } else {
+                    Ok(0)
+                }
             },
             media::OutputMode::DSD => {
                 let buf = unsafe {
@@ -67,8 +87,11 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
                     )
                 };
 
-                let io = io_dsd.as_ref().unwrap();
-                Ok(io.writei(buf)? * channel)
+                if let Some(Ok(io)) = &*io_dsd_in_fn.borrow() {
+                    Ok(io.writei(buf)? * channel)
+                } else {
+                    Ok(0)
+                }
             },
         }
     });
@@ -76,7 +99,29 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
     let mut eof = false;
 
     loop {
-        player.wait(None)?;
+        if let Ok(cmd) = rx.try_recv() {
+            match cmd {
+                PlayerCommand::Play(media_spec) => {
+                    player.drop()?;
+                    player.init(media_spec)?;
+                    let mut spec = spec.borrow_mut();
+                    *spec = media_spec;
+
+                    drop(io.take());
+                    *io.borrow_mut() = Some(player.io_i32());
+                    drop(io_dsd.take());
+                    *io_dsd.borrow_mut() = Some(player.io_u32());
+                },
+                PlayerCommand::Resume => {
+                    player.pause(false)?;
+                },
+                PlayerCommand::Pause => {
+                    player.pause(true)?;
+                },
+            }
+        }
+
+        player.wait(Some(32))?;
         if !matches!(player.state(), State::Running | State::Prepared) {
             player.prepare()?;
         }
@@ -103,6 +148,7 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
             continue;
         }
 
+        // todo return eof event to controller
         if prod.is_empty() && eof {
             break;
         }
@@ -130,11 +176,28 @@ fn player(path: impl Into<PathBuf>, device: String) -> Result<()> {
             },
         }
 
-        if !matches!(player.state(), State::Running) {
+        if !matches!(player.state(), State::Running|State::Paused) {
             player.start()?;
         }
     }
 
     player.drain()?;
     Ok(())
+}
+
+fn all_media_path(p: PathBuf) -> Vec<PathBuf> {
+    WalkDir::new(p)
+        .into_iter()
+        .filter_entry(|e| !is_media_file(e))
+        .flatten()
+        .map(|e| e.into_path())
+        .collect()
+}
+
+fn is_media_file(e: &DirEntry) -> bool {
+    let p = e.path()
+        .extension()
+        .and_then(|s| s.to_str());
+
+    matches!(p, Some("flac"|"wav"|"ogg"|"aac"|"mp3"))
 }

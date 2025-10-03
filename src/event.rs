@@ -1,6 +1,9 @@
+use crate::media::MediaSpec;
+
 #[derive(Copy, Clone)]
-pub enum PlayerEvent {
-    Play,
+pub enum PlayerCommand {
+    Play(MediaSpec),
+    Resume,
     Pause,
 }
 

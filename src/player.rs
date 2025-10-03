@@ -25,7 +25,7 @@ impl Player {
         })
     }
 
-    pub fn set_hw_param(&mut self, spec: MediaSpec) -> Result<()> {
+    pub fn set_hw_param(&self, spec: MediaSpec) -> Result<()> {
         use OutputMode::*;
         match spec.mode {
             PCM => self.pcm_hw_param(spec.channel, spec.sample_rate),
@@ -33,7 +33,7 @@ impl Player {
         }
     }
 
-    pub fn pcm_hw_param(&mut self, channel: u32, bit_rate: u32) -> Result<()> {
+    pub fn pcm_hw_param(&self, channel: u32, bit_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.output)?;
         hwp.set_channels(channel)?;
         hwp.set_rate(bit_rate, alsa::ValueOr::Nearest)?;
@@ -43,7 +43,7 @@ impl Player {
         Ok(())
     }
 
-    pub fn dsd_hw_param(&mut self, channel: u32, bit_rate: u32) -> Result<()> {
+    pub fn dsd_hw_param(&self, channel: u32, bit_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.output)?;
         hwp.set_channels(channel)?;
         hwp.set_format(alsa::pcm::Format::DSDU32LE)?;
@@ -53,7 +53,7 @@ impl Player {
         Ok(())
     }
 
-    pub fn set_sw_param(&mut self, spec: MediaSpec) -> Result<()> {
+    pub fn set_sw_param(&self, spec: MediaSpec) -> Result<()> {
         use OutputMode::*;
         match spec.mode {
             PCM => self.pcm_sw_param(),
@@ -61,7 +61,7 @@ impl Player {
         }
     }
 
-    pub fn pcm_sw_param(&mut self) -> Result<()> {
+    pub fn pcm_sw_param(&self) -> Result<()> {
         let swp = self.output.sw_params_current()?;
         let hwp = self.output.hw_params_current()?;
         swp.set_start_threshold(hwp.get_buffer_size().unwrap())?;
@@ -69,11 +69,11 @@ impl Player {
         Ok(())
     }
 
-    pub fn dsd_sw_param(&mut self) -> Result<()> {
+    pub fn dsd_sw_param(&self) -> Result<()> {
         self.pcm_sw_param()
     }
 
-    pub fn init(&mut self, spec: MediaSpec) -> Result<()> {
+    pub fn init(&self, spec: MediaSpec) -> Result<()> {
         self.set_hw_param(spec)?;
         self.set_sw_param(spec)?;
 
