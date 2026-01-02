@@ -1,27 +1,28 @@
-use std::{cell::RefCell, collections::VecDeque, path::PathBuf, rc::Rc, sync::mpsc::{channel, Receiver}};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    path::PathBuf,
+    rc::Rc,
+    sync::mpsc::{Receiver, channel},
+};
 
 use alsa::pcm::State;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Parser;
+use oto::{
+    cli,
+    decoder::{Decoder, DecoderError, DecoderManager},
+    event::PlayerCommand,
+    media,
+    player::Player,
+};
 use ringbuf::{
+    LocalRb,
     storage::Heap,
     traits::{Consumer, Observer, Producer, Split},
-    LocalRb
 };
-use tokio::task::{spawn_blocking, JoinHandle};
+use tokio::task::{JoinHandle, spawn_blocking};
 use walkdir::{DirEntry, WalkDir};
-
-use crate::{
-    decoder::{Decoder, DecoderError, DecoderManager}, event::PlayerCommand, player::Player
-};
-
-mod cli;
-mod decoder;
-mod event;
-mod media;
-mod player;
-mod shared;
-mod store;
 
 const I32_BYTE: usize = i32::BITS as usize / 8;
 
@@ -39,12 +40,13 @@ async fn main() -> Result<()> {
 
     match args.command {
         cli::Commands::Play { path, device } => {
-            let _player_handle: JoinHandle<Result<()>> = spawn_blocking(move || player(path, device, rx));
+            let _player_handle: JoinHandle<Result<()>> =
+                spawn_blocking(move || player(path, device, rx));
             _player_handle.await?
-        },
+        }
         cli::Commands::PlayList { command } => {
             todo!()
-        },
+        }
     }
 }
 
@@ -70,31 +72,26 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
     let io_dsd_in_fn = io_dsd.clone();
 
     #[allow(clippy::type_complexity)]
-    let write_io: Box<dyn Fn(&[i32]) -> anyhow::Result<usize>> = Box::new(move |buf: &[i32]| {
-        match spec_in_fn.borrow().mode {
+    let write_io: Box<dyn Fn(&[i32]) -> anyhow::Result<usize>> =
+        Box::new(move |buf: &[i32]| match spec_in_fn.borrow().mode {
             media::OutputMode::PCM => {
                 if let Some(Ok(io)) = &*io_in_fn.borrow() {
                     Ok(io.writei(buf)? * channel)
                 } else {
                     Ok(0)
                 }
-            },
+            }
             media::OutputMode::DSD => {
-                let buf = unsafe {
-                    std::slice::from_raw_parts(
-                        buf.as_ptr() as *const u32,
-                        buf.len()
-                    )
-                };
+                let buf =
+                    unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u32, buf.len()) };
 
                 if let Some(Ok(io)) = &*io_dsd_in_fn.borrow() {
                     Ok(io.writei(buf)? * channel)
                 } else {
                     Ok(0)
                 }
-            },
-        }
-    });
+            }
+        });
 
     let mut eof = false;
 
@@ -111,13 +108,13 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
                     *io.borrow_mut() = Some(player.io_i32());
                     drop(io_dsd.take());
                     *io_dsd.borrow_mut() = Some(player.io_u32());
-                },
+                }
                 PlayerCommand::Resume => {
                     player.pause(false)?;
-                },
+                }
                 PlayerCommand::Pause => {
                     player.pause(true)?;
-                },
+                }
             }
         }
 
@@ -165,18 +162,18 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
                     let data = temp_buf.drain(..write_to_rb);
                     prod.push_iter(data);
                 }
-            },
+            }
             Err(DecoderError::EOF) => {
                 eof = true;
                 continue;
-            },
-            Err(DecoderError::Ignored) => { },
+            }
+            Err(DecoderError::Ignored) => {}
             Err(_) => {
                 continue;
-            },
+            }
         }
 
-        if !matches!(player.state(), State::Running|State::Paused) {
+        if !matches!(player.state(), State::Running | State::Paused) {
             player.start()?;
         }
     }
@@ -195,9 +192,7 @@ fn all_media_path(p: PathBuf) -> Vec<PathBuf> {
 }
 
 fn is_media_file(e: &DirEntry) -> bool {
-    let p = e.path()
-        .extension()
-        .and_then(|s| s.to_str());
+    let p = e.path().extension().and_then(|s| s.to_str());
 
-    matches!(p, Some("flac"|"wav"|"ogg"|"aac"|"mp3"))
+    matches!(p, Some("flac" | "wav" | "ogg" | "aac" | "mp3"))
 }
