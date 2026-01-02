@@ -110,10 +110,8 @@ impl PcmDecoder {
 
         // Create a probe hint using the file's extension. [Optional]
         let mut hint = Hint::new();
-        if let Some(ext) = p.extension() {
-            if let Some(ext) = ext.to_str() {
-                hint.with_extension(ext);
-            }
+        if let Some(ext) = p.extension() && let Some(ext) = ext.to_str() {
+            hint.with_extension(ext);
         }
 
         // Use the default options for metadata and format readers.

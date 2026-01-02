@@ -1,7 +1,10 @@
 use anyhow::Result;
-use sqlx::{Pool, Sqlite, Row};
+use sqlx::{Pool, Row, Sqlite};
 
-use crate::{media::{Album, AlbumInDb, Media}, shared::PROJ_DIRS};
+use crate::{
+    media::{Album, AlbumInDb, Media},
+    shared::PROJ_DIRS,
+};
 
 const TRASITION_COMMIT_LIMIT: u8 = 64;
 
@@ -13,7 +16,10 @@ pub struct Store {
 
 impl Store {
     pub async fn new() -> Result<Self> {
-        let db_path = format!("sqlite:///{}", PROJ_DIRS.data_dir().join("db.sqlite").to_string_lossy());
+        let db_path = format!(
+            "sqlite:///{}",
+            PROJ_DIRS.data_dir().join("db.sqlite").to_string_lossy()
+        );
         let conn = Pool::<Sqlite>::connect(&db_path).await?;
         let mut store = Self {
             conn,
@@ -59,7 +65,8 @@ impl Store {
         let albums = sqlx::query_as::<_, AlbumInDb>(query)
             .bind(album.name)
             .bind(album.cover)
-            .fetch_all(&self.conn).await?;
+            .fetch_all(&self.conn)
+            .await?;
 
         Ok(albums)
     }
