@@ -3,11 +3,8 @@ use std::ops::Deref;
 use anyhow::Result;
 
 use alsa::{
-    pcm::{
-        HwParams, State
-    },
-    Direction,
-    PCM
+    Direction, PCM,
+    pcm::{HwParams, State},
 };
 
 use crate::media::{MediaSpec, OutputMode};
@@ -18,11 +15,29 @@ pub struct Player {
 
 impl Player {
     pub fn new(device_name: impl AsRef<str>) -> Result<Self> {
-        let pcm = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
+        let output = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
 
-        Ok(Self {
-            output: pcm,
-        })
+        Ok(Self { output })
+    }
+
+    pub fn write_io(&self, buf: &[i32], spec: MediaSpec) -> Result<usize> {
+        let channel = spec.channel as usize;
+        match spec.mode {
+            OutputMode::PCM => {
+                if let Ok(io) = self.output.io_i32() {
+                    Ok(io.writei(buf)? * channel)
+                } else {
+                    Ok(0)
+                }
+            }
+            OutputMode::DSD => {
+                let buf =
+                    unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u32, buf.len()) };
+
+                let io = unsafe { self.output.io_unchecked::<u32>() };
+                Ok(io.writei(buf)? * channel)
+            }
+        }
     }
 
     pub fn set_hw_param(&self, spec: MediaSpec) -> Result<()> {
@@ -46,7 +61,7 @@ impl Player {
     pub fn dsd_hw_param(&self, channel: u32, bit_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.output)?;
         hwp.set_channels(channel)?;
-        hwp.set_format(alsa::pcm::Format::DSDU32LE)?;
+        hwp.set_format(alsa::pcm::Format::DSDU32BE)?;
         hwp.set_rate(bit_rate, alsa::ValueOr::Nearest)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
         self.output.hw_params(&hwp)?;

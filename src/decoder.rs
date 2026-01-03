@@ -235,6 +235,7 @@ pub struct DsdReader {
     dsd_chunk_size: u64,
     fmt_chunk_size: u64,
     data_chunk_size: u64,
+    block_size_per_ch: u32,
     reader: std::fs::File,
     size: u64,
 }
@@ -250,9 +251,13 @@ impl DsdReader {
         let mut metadata_pot_buf = [0u8; 8];
         let mut channel_num_buf = [0u8; 4];
         let mut sample_freq_buf =  [0u8; 4];
+        let mut block_size_per_ch_buf = [0u8; 4];
 
         // 'DSD '
         reader.read_exact(&mut u32_buf)?;
+        if &u32_buf != b"DSD " {
+            return Err(anyhow!("not dsf file"));
+        }
         // size of dsd chunk
         reader.read_exact(&mut dsd_chunk_size_buf)?;
         // totol file size
@@ -261,6 +266,9 @@ impl DsdReader {
         reader.read_exact(&mut metadata_pot_buf)?;
         // 'fmt '
         reader.read_exact(&mut u32_buf)?;
+        if &u32_buf != b"fmt " {
+            return Err(anyhow!("not dsf file"));
+        }
         // size of fmt chunk
         reader.read_exact(&mut fmt_chunk_size_buf)?;
         // format version
@@ -278,11 +286,14 @@ impl DsdReader {
         // sample count
         reader.read_exact(&mut u64_buf)?;
         // block size per channel
-        reader.read_exact(&mut u32_buf)?;
+        reader.read_exact(&mut block_size_per_ch_buf)?;
         // reserved
         reader.read_exact(&mut u32_buf)?;
         // 'data'
         reader.read_exact(&mut u32_buf)?;
+        if &u32_buf != b"data" {
+            return Err(anyhow!("not dsf file"));
+        }
         // size of data chunk
         reader.read_exact(&mut data_chunk_size_buf)?;
 
@@ -291,6 +302,7 @@ impl DsdReader {
         let fmt_chunk_size = u64::from_le_bytes(fmt_chunk_size_buf);
         let data_chunk_size = u64::from_le_bytes(data_chunk_size_buf);
         let file_size = u64::from_le_bytes(file_size_buf);
+        let block_size_per_ch = u32::from_le_bytes(block_size_per_ch_buf);
         let dsd_size = dsd_chunk_size + fmt_chunk_size + data_chunk_size;
         if dsd_size > file_size {
             return Err(anyhow!("dsd file parser error"));
@@ -320,6 +332,7 @@ impl DsdReader {
             dsd_chunk_size,
             fmt_chunk_size,
             data_chunk_size,
+            block_size_per_ch,
             reader,
             size: file_size - 12,
         })

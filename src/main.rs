@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::Cell,
     collections::VecDeque,
     path::PathBuf,
     rc::Rc,
@@ -13,8 +13,8 @@ use oto::{
     cli,
     decoder::{Decoder, DecoderError, DecoderManager},
     event::PlayerCommand,
-    media,
     player::Player,
+    shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
 use ringbuf::{
     LocalRb,
@@ -23,14 +23,6 @@ use ringbuf::{
 };
 use tokio::task::{JoinHandle, spawn_blocking};
 use walkdir::{DirEntry, WalkDir};
-
-const I32_BYTE: usize = i32::BITS as usize / 8;
-
-// 256kb i32
-const TMP_BUF_ALLOC: usize = (1024 * 256) / I32_BYTE;
-
-// 4mb i32
-const RING_BUF_ALLOC: usize = (1024 * 1024 * 4) / I32_BYTE;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -58,40 +50,11 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
     let mut dm = DecoderManager::default();
     dm.open(path.into())?;
     let spec = dm.spec().ok_or(anyhow!("unknown codec"))?;
-    let channel = spec.channel as usize;
 
     let player = Player::new(&device)?;
     player.init(spec)?;
-    let io = Rc::new(RefCell::new(Some(player.io_i32())));
-    let io_dsd = Rc::new(RefCell::new(Some(player.io_u32())));
 
-    let spec = Rc::new(RefCell::new(spec));
-
-    let spec_in_fn = spec.clone();
-    let io_in_fn = io.clone();
-    let io_dsd_in_fn = io_dsd.clone();
-
-    #[allow(clippy::type_complexity)]
-    let write_io: Box<dyn Fn(&[i32]) -> anyhow::Result<usize>> =
-        Box::new(move |buf: &[i32]| match spec_in_fn.borrow().mode {
-            media::OutputMode::PCM => {
-                if let Some(Ok(io)) = &*io_in_fn.borrow() {
-                    Ok(io.writei(buf)? * channel)
-                } else {
-                    Ok(0)
-                }
-            }
-            media::OutputMode::DSD => {
-                let buf =
-                    unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u32, buf.len()) };
-
-                if let Some(Ok(io)) = &*io_dsd_in_fn.borrow() {
-                    Ok(io.writei(buf)? * channel)
-                } else {
-                    Ok(0)
-                }
-            }
-        });
+    let spec = Rc::new(Cell::new(spec));
 
     let mut eof = false;
 
@@ -99,15 +62,11 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
                 PlayerCommand::Play(media_spec) => {
-                    player.drop()?;
-                    player.init(media_spec)?;
-                    let mut spec = spec.borrow_mut();
-                    *spec = media_spec;
-
-                    drop(io.take());
-                    *io.borrow_mut() = Some(player.io_i32());
-                    drop(io_dsd.take());
-                    *io_dsd.borrow_mut() = Some(player.io_u32());
+                    if spec.get() != media_spec {
+                        player.drop()?;
+                        player.init(media_spec)?;
+                        spec.set(media_spec);
+                    }
                 }
                 PlayerCommand::Resume => {
                     player.pause(false)?;
@@ -126,8 +85,8 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
         // consume the last data in ring buffer
         if !cons.is_empty() {
             let (right, left) = cons.as_slices();
-            let wr = write_io(right)?;
-            let wl = write_io(left)?;
+            let wr = player.write_io(right, spec.get())?;
+            let wl = player.write_io(left, spec.get())?;
             cons.skip(wr + wl);
         }
 
@@ -150,13 +109,15 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
             break;
         }
 
+        // todo handle if alsa consumer too slow
         match dm.decode(&mut temp_buf) {
             Ok(_) => {
                 let (right, left) = temp_buf.as_slices();
-                let wr = write_io(right)?;
-                let wl = write_io(left)?;
+                let wr = player.write_io(right, spec.get())?;
+                let wl = player.write_io(left, spec.get())?;
                 temp_buf.drain(..(wr + wl));
 
+                // push remaining decoded data to rb
                 if !temp_buf.is_empty() {
                     let write_to_rb = prod.vacant_len().min(temp_buf.len());
                     let data = temp_buf.drain(..write_to_rb);
@@ -194,5 +155,5 @@ fn all_media_path(p: PathBuf) -> Vec<PathBuf> {
 fn is_media_file(e: &DirEntry) -> bool {
     let p = e.path().extension().and_then(|s| s.to_str());
 
-    matches!(p, Some("flac" | "wav" | "ogg" | "aac" | "mp3"))
+    matches!(p, Some("flac" | "wav" | "ogg" | "aac" | "mp3" | "dsf"))
 }
