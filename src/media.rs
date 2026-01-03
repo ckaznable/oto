@@ -8,7 +8,7 @@ pub enum OutputMode {
     DSD,
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug)]
 pub struct Media {
     pub file_path: String,
     pub album: Album,
@@ -17,7 +17,7 @@ pub struct Media {
     pub track: u8,
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug)]
 pub struct Album {
     pub name: String,
     pub year: u16,
@@ -25,7 +25,7 @@ pub struct Album {
     pub cover: String,
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug)]
 pub struct AlbumInDb {
     pub id: i32,
     pub name: String,
