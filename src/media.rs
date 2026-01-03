@@ -49,7 +49,7 @@ impl Default for AlbumInDb {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MediaSpec {
     pub sample_rate: u32,
-    pub channel: u32,
+    pub channels: u32,
     pub mode: OutputMode,
 }
 

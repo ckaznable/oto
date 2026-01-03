@@ -21,7 +21,7 @@ impl Player {
     }
 
     pub fn write_io(&self, buf: &[i32], spec: MediaSpec) -> Result<usize> {
-        let channel = spec.channel as usize;
+        let channel = spec.channels as usize;
         match spec.mode {
             OutputMode::PCM => {
                 if let Ok(io) = self.output.io_i32() {
@@ -43,8 +43,8 @@ impl Player {
     pub fn set_hw_param(&self, spec: MediaSpec) -> Result<()> {
         use OutputMode::*;
         match spec.mode {
-            PCM => self.pcm_hw_param(spec.channel, spec.sample_rate),
-            DSD => self.dsd_hw_param(spec.channel, spec.sample_rate),
+            PCM => self.pcm_hw_param(spec.channels, spec.sample_rate),
+            DSD => self.dsd_hw_param(spec.channels, spec.sample_rate),
         }
     }
 
