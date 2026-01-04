@@ -11,20 +11,16 @@ use oto::{
     event::PlayerCommand,
     player::{AudioOutput, BufferPlayer, PlayerError},
 };
-use tokio::task::{JoinHandle, spawn_blocking};
 use walkdir::{DirEntry, WalkDir};
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = cli::Args::parse();
 
     let (tx, rx) = channel();
 
     match args.command {
         cli::Commands::Play { path, device } => {
-            let _player_handle: JoinHandle<Result<()>> =
-                spawn_blocking(move || player(path, device, rx));
-            _player_handle.await?
+            player(path, device, rx)
         }
         cli::Commands::PlayList { command } => {
             todo!()

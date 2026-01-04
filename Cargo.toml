@@ -13,7 +13,6 @@ id3 = "1.16.3"
 ringbuf = "0.4.8"
 symphonia = { version = "0.5.5", features = ["all-codecs"]}
 thiserror = "2.0.17"
-tokio = { version = "1", features = ["full"] }
 walkdir = "2.5.0"
 
 [profile.release]
