@@ -1,25 +1,15 @@
 use std::{
-    cell::Cell,
-    collections::VecDeque,
     path::PathBuf,
-    rc::Rc,
     sync::mpsc::{Receiver, channel},
 };
 
 use alsa::pcm::State;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use clap::Parser;
 use oto::{
     cli,
-    decoder::{Decoder, DecoderError, DecoderManager},
     event::PlayerCommand,
-    player::Player,
-    shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
-};
-use ringbuf::{
-    LocalRb,
-    storage::Heap,
-    traits::{Consumer, Observer, Producer, Split},
+    player::{AudioOutput, BufferPlayer, PlayerError},
 };
 use tokio::task::{JoinHandle, spawn_blocking};
 use walkdir::{DirEntry, WalkDir};
@@ -43,103 +33,42 @@ async fn main() -> Result<()> {
 }
 
 fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>) -> Result<()> {
-    let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
-    let (mut prod, mut cons) = rb.split();
-    let mut temp_buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
+    let mut player = BufferPlayer::new()?;
+    player.open(path)?;
 
-    let mut dm = DecoderManager::default();
-    dm.open(path.into())?;
-    let spec = dm.spec().ok_or(anyhow!("unknown codec"))?;
-
-    let player = Player::new(&device)?;
-    player.init(spec)?;
-
-    let spec = Rc::new(Cell::new(spec));
-
-    let mut eof = false;
+    let mut output = AudioOutput::new(&device)?;
+    output.init(player.spec.unwrap())?;
 
     loop {
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
                 PlayerCommand::Play(media_spec) => {
-                    if spec.get() != media_spec {
-                        player.drop()?;
-                        player.init(media_spec)?;
-                        spec.set(media_spec);
-                    }
+                    player.set_spec(media_spec, &mut output)?;
                 }
                 PlayerCommand::Resume => {
-                    player.pause(false)?;
+                    output.pause(false)?;
                 }
                 PlayerCommand::Pause => {
-                    player.pause(true)?;
+                    output.pause(true)?;
                 }
             }
         }
 
-        player.wait(Some(32))?;
-        if !matches!(player.state(), State::Running | State::Prepared) {
-            player.prepare()?;
+        output.wait(Some(32))?;
+        if !matches!(output.state(), State::Running | State::Prepared) {
+            output.prepare()?;
         }
 
-        // consume the last data in ring buffer
-        if !cons.is_empty() {
-            let (right, left) = cons.as_slices();
-            let wr = player.write_io(right, spec.get())?;
-            let wl = player.write_io(left, spec.get())?;
-            cons.skip(wr + wl);
-        }
-
-        if !temp_buf.is_empty() {
-            let write_to_rb = prod.vacant_len().min(temp_buf.len());
-            let data = temp_buf.drain(..write_to_rb);
-            prod.push_iter(data);
-        }
-
-        if temp_buf.is_empty() {
-            temp_buf.shrink_to(TMP_BUF_ALLOC);
-        }
-
-        if !prod.is_empty() {
-            continue;
-        }
-
-        // todo return eof event to controller
-        if prod.is_empty() && eof {
+        if let Err(PlayerError::EOF) = player.consume(&mut output) {
             break;
         }
 
-        // todo handle if alsa consumer too slow
-        match dm.decode(&mut temp_buf) {
-            Ok(_) => {
-                let (right, left) = temp_buf.as_slices();
-                let wr = player.write_io(right, spec.get())?;
-                let wl = player.write_io(left, spec.get())?;
-                temp_buf.drain(..(wr + wl));
-
-                // push remaining decoded data to rb
-                if !temp_buf.is_empty() {
-                    let write_to_rb = prod.vacant_len().min(temp_buf.len());
-                    let data = temp_buf.drain(..write_to_rb);
-                    prod.push_iter(data);
-                }
-            }
-            Err(DecoderError::EOF) => {
-                eof = true;
-                continue;
-            }
-            Err(DecoderError::Ignored) => {}
-            Err(_) => {
-                continue;
-            }
-        }
-
-        if !matches!(player.state(), State::Running | State::Paused) {
-            player.start()?;
+        if !matches!(output.state(), State::Running | State::Paused) {
+            output.start()?;
         }
     }
 
-    player.drain()?;
+    output.drain()?;
     Ok(())
 }
 

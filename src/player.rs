@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::VecDeque, ops::Deref, path::PathBuf};
 
 use anyhow::Result;
 
@@ -6,14 +6,24 @@ use alsa::{
     Direction, PCM,
     pcm::{HwParams, State},
 };
+use bytemuck::cast_slice;
+use ringbuf::{
+    LocalRb,
+    storage::Heap,
+    traits::{Consumer, Observer, Producer},
+};
 
-use crate::media::{MediaSpec, OutputMode};
+use crate::{
+    decoder::{Decoder, DecoderError, DecoderManager},
+    media::{MediaSpec, OutputMode},
+    shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
+};
 
-pub struct Player {
+pub struct AudioOutput {
     output: PCM,
 }
 
-impl Player {
+impl AudioOutput {
     pub fn new(device_name: impl AsRef<str>) -> Result<Self> {
         let output = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
 
@@ -31,11 +41,8 @@ impl Player {
                 }
             }
             OutputMode::DSD => {
-                let buf =
-                    unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u32, buf.len()) };
-
                 let io = unsafe { self.output.io_unchecked::<u32>() };
-                Ok(io.writei(buf)? * channel)
+                Ok(io.writei(cast_slice(buf))? * channel)
             }
         }
     }
@@ -101,10 +108,127 @@ impl Player {
     }
 }
 
-impl Deref for Player {
+impl Deref for AudioOutput {
     type Target = PCM;
 
     fn deref(&self) -> &Self::Target {
         &self.output
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum PlayerError {
+    #[error("eof")]
+    EOF,
+    #[error("decoder is init yet, call open to init")]
+    DecoderNotInit,
+    #[error("{0}")]
+    Unexcepted(String),
+}
+
+impl From<anyhow::Error> for PlayerError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Unexcepted(value.to_string())
+    }
+}
+
+pub type PlayerResult = Result<(), PlayerError>;
+
+pub struct BufferPlayer {
+    rb: LocalRb<Heap<i32>>,
+    buf: VecDeque<i32>,
+    dm: DecoderManager,
+    eof: bool,
+    pub spec: Option<MediaSpec>,
+}
+
+impl BufferPlayer {
+    pub fn new() -> Result<Self> {
+        let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
+        let buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
+
+        let dm = DecoderManager::default();
+
+        Ok(Self {
+            rb,
+            buf,
+            dm,
+            spec: None,
+            eof: false,
+        })
+    }
+
+    pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {
+        self.dm.open(p.into())?;
+        self.spec = self.dm.spec();
+        Ok(())
+    }
+
+    pub fn set_spec(&mut self, media_spec: MediaSpec, output: &mut AudioOutput) -> Result<()> {
+        if let Some(spec) = self.spec
+            && spec != media_spec
+        {
+            output.drop()?;
+            output.init(media_spec)?;
+            self.spec = Some(media_spec);
+        }
+
+        Ok(())
+    }
+
+    pub fn consume(&mut self, output: &mut AudioOutput) -> PlayerResult {
+        let Some(spec) = self.spec else {
+            return Err(PlayerError::DecoderNotInit);
+        };
+
+        // consume the last data in ring buffer
+        if !self.rb.is_empty() {
+            let (right, left) = self.rb.as_slices();
+            let wr = output.write_io(right, spec)?;
+            let wl = output.write_io(left, spec)?;
+            self.rb.skip(wr + wl);
+        }
+
+        if !self.buf.is_empty() {
+            let write_to_rb = self.rb.vacant_len().min(self.buf.len());
+            let data = self.buf.drain(..write_to_rb);
+            self.rb.push_iter(data);
+        }
+
+        if self.buf.is_empty() {
+            self.buf.shrink_to(TMP_BUF_ALLOC);
+        }
+
+        if !self.rb.is_empty() {
+            return Ok(());
+        }
+
+        // todo return eof event to controller
+        if self.rb.is_empty() && self.eof {
+            return Err(PlayerError::EOF);
+        }
+
+        // todo handle if alsa consumer too slow
+        match self.dm.decode(&mut self.buf) {
+            Ok(_) => {
+                let (right, left) = self.buf.as_slices();
+                let wr = output.write_io(right, spec)?;
+                let wl = output.write_io(left, spec)?;
+                self.buf.drain(..(wr + wl));
+
+                // push remaining decoded data to rb
+                if !self.buf.is_empty() {
+                    let write_to_rb = self.rb.vacant_len().min(self.buf.len());
+                    let data = self.buf.drain(..write_to_rb);
+                    self.rb.push_iter(data);
+                }
+            }
+            Err(DecoderError::EOF) => {
+                self.eof = true;
+            }
+            _ => {}
+        }
+
+        Ok(())
     }
 }

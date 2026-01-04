@@ -331,6 +331,11 @@ impl<R: Read + Seek> DsdReader<R> {
             raw_block_buf: vec![0u8; raw_buffer_size],
         })
     }
+
+    pub fn reset(&mut self) -> anyhow::Result<()> {
+        self.reader.seek(SeekFrom::Start(self.dsd_chunk_size + self.fmt_chunk_size + 12))?;
+        Ok(())
+    }
 }
 
 impl<R: Read + Seek> Decoder for DsdReader<R> {
