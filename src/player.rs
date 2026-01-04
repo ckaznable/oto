@@ -55,21 +55,21 @@ impl AudioOutput {
         }
     }
 
-    pub fn pcm_hw_param(&self, channel: u32, bit_rate: u32) -> Result<()> {
+    pub fn pcm_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.output)?;
         hwp.set_channels(channel)?;
-        hwp.set_rate(bit_rate, alsa::ValueOr::Nearest)?;
+        hwp.set_rate(sample_rate, alsa::ValueOr::Nearest)?;
         hwp.set_format(alsa::pcm::Format::S32LE)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
         self.output.hw_params(&hwp)?;
         Ok(())
     }
 
-    pub fn dsd_hw_param(&self, channel: u32, bit_rate: u32) -> Result<()> {
+    pub fn dsd_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.output)?;
         hwp.set_channels(channel)?;
         hwp.set_format(alsa::pcm::Format::DSDU32BE)?;
-        hwp.set_rate(bit_rate, alsa::ValueOr::Nearest)?;
+        hwp.set_rate(sample_rate / 32, alsa::ValueOr::Nearest)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
         self.output.hw_params(&hwp)?;
         Ok(())

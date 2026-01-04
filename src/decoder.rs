@@ -371,7 +371,7 @@ impl<R: Read + Seek> Decoder for DsdReader<R> {
                 } else {
                     u32_view[src_index] as i32
                 };
-                buf.push_back(sample);
+                buf.push_back(sample.reverse_bits());
             }
         }
 
