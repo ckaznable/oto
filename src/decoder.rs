@@ -313,7 +313,7 @@ impl<R: Read + Seek> DsdReader<R> {
 
         let raw_buffer_size = (block_size_per_ch * spec.channels) as usize;
 
-        println!("{:?}", spec);
+        log::debug!("{:?}", spec);
 
         // reset reader to data position
         reader.seek(SeekFrom::Start(dsd_chunk_size + fmt_chunk_size + 12))?;

@@ -1,6 +1,10 @@
-use std::{collections::VecDeque, ops::Deref, path::PathBuf};
+use std::{
+    collections::VecDeque,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 use alsa::{
     Direction, PCM,
@@ -12,6 +16,7 @@ use ringbuf::{
     storage::Heap,
     traits::{Consumer, Observer, Producer},
 };
+use walkdir::{DirEntry, WalkDir};
 
 use crate::{
     decoder::{Decoder, DecoderError, DecoderManager},
@@ -139,28 +144,54 @@ pub struct BufferPlayer {
     buf: VecDeque<i32>,
     dm: DecoderManager,
     eof: bool,
+    playlist: PlayList,
     pub spec: Option<MediaSpec>,
 }
 
 impl BufferPlayer {
-    pub fn new() -> Result<Self> {
+    pub fn new(p: impl Into<PathBuf>) -> Result<Self> {
         let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
         let buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
 
         let dm = DecoderManager::default();
+        let playlist = PlayList::new(p);
 
         Ok(Self {
             rb,
             buf,
             dm,
+            playlist,
             spec: None,
             eof: false,
         })
     }
 
+    pub fn init(&mut self) -> Result<()> {
+        let p = self.playlist.current().ok_or(anyhow!("music file not found"))?;
+        self.open(p)
+    }
+
     pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {
         self.dm.open(p.into())?;
         self.spec = self.dm.spec();
+        Ok(())
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Result<()> {
+        if let Some(p) = self.playlist.next() {
+            self.open(p)?;
+            return Ok(());
+        }
+
+        Err(anyhow!("playlist is run dry"))
+    }
+
+    pub fn prev(&mut self) -> Result<()> {
+        if let Some(p) = self.playlist.prev() {
+            self.open(p)?;
+        }
+
         Ok(())
     }
 
@@ -224,11 +255,86 @@ impl BufferPlayer {
                 }
             }
             Err(DecoderError::EOF) => {
-                self.eof = true;
+                if self.playlist.is_end() {
+                    self.eof = true;
+                }
+
+                if let Err(e) = self.next() {
+                    log::error!("{e:?}");
+                    self.eof = true;
+                }
             }
             _ => {}
         }
 
         Ok(())
     }
+}
+
+#[derive(Clone)]
+pub struct PlayList {
+    list: Vec<PathBuf>,
+    index: usize,
+}
+
+impl PlayList {
+    pub fn new(p: impl Into<PathBuf>) -> Self {
+        let p = p.into();
+        let mut list = Self {
+            list: vec![],
+            index: 0,
+        };
+
+        if !p.exists() {
+            return list;
+        }
+
+        if p.is_file() {
+            list.list.push(p);
+        } else {
+            list.list = all_media_path(&p);
+        }
+
+        list
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Option<PathBuf> {
+        let next = self.index + 1;
+        if next >= self.list.len() {
+            return None;
+        }
+
+        self.index = next;
+        self.list.get(next).cloned()
+    }
+
+    pub fn prev(&mut self) -> Option<PathBuf> {
+        self.index = self.index.saturating_sub(1);
+        self.list.get(self.index).cloned()
+    }
+
+    #[inline]
+    pub fn current(&self) -> Option<PathBuf> {
+        self.list.get(self.index).cloned()
+    }
+
+    #[inline]
+    pub fn is_end(&self) -> bool {
+        self.list.len() == self.index.saturating_sub(1)
+    }
+}
+
+fn all_media_path(p: &Path) -> Vec<PathBuf> {
+    WalkDir::new(p)
+        .into_iter()
+        .flatten()
+        .filter(is_media_file)
+        .map(|e| e.into_path())
+        .collect()
+}
+
+fn is_media_file(e: &DirEntry) -> bool {
+    let p = e.path().extension().and_then(|s| s.to_str());
+    matches!(p, Some("flac" | "wav" | "ogg" | "aac" | "mp3" | "dsf"))
 }

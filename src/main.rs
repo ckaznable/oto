@@ -11,7 +11,6 @@ use oto::{
     event::PlayerCommand,
     player::{AudioOutput, BufferPlayer, PlayerError},
 };
-use walkdir::{DirEntry, WalkDir};
 
 fn main() -> Result<()> {
     let args = cli::Args::parse();
@@ -29,8 +28,8 @@ fn main() -> Result<()> {
 }
 
 fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>) -> Result<()> {
-    let mut player = BufferPlayer::new()?;
-    player.open(path)?;
+    let mut player = BufferPlayer::new(path)?;
+    player.init()?;
 
     let mut output = AudioOutput::new(&device)?;
     output.init(player.spec.unwrap())?;
@@ -38,9 +37,6 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
     loop {
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
-                PlayerCommand::Play(media_spec) => {
-                    player.set_spec(media_spec, &mut output)?;
-                }
                 PlayerCommand::Resume => {
                     output.pause(false)?;
                 }
@@ -68,17 +64,3 @@ fn player(path: impl Into<PathBuf>, device: String, rx: Receiver<PlayerCommand>)
     Ok(())
 }
 
-fn all_media_path(p: PathBuf) -> Vec<PathBuf> {
-    WalkDir::new(p)
-        .into_iter()
-        .filter_entry(|e| !is_media_file(e))
-        .flatten()
-        .map(|e| e.into_path())
-        .collect()
-}
-
-fn is_media_file(e: &DirEntry) -> bool {
-    let p = e.path().extension().and_then(|s| s.to_str());
-
-    matches!(p, Some("flac" | "wav" | "ogg" | "aac" | "mp3" | "dsf"))
-}

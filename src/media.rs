@@ -25,27 +25,6 @@ pub struct Album {
     pub cover: String,
 }
 
-#[derive(Clone, Debug)]
-pub struct AlbumInDb {
-    pub id: i32,
-    pub name: String,
-    pub year: u16,
-    pub track: u8,
-    pub cover: String,
-}
-
-impl Default for AlbumInDb {
-    fn default() -> Self {
-        Self {
-            id: DEFAULT_ALBUM_ID,
-            name: DEFAULT_ALBUM_NAME.to_owned(),
-            year: Default::default(),
-            track: Default::default(),
-            cover: Default::default(),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MediaSpec {
     pub sample_rate: u32,
