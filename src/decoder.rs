@@ -7,17 +7,56 @@ use std::{
 use anyhow::{Result, anyhow};
 
 use bytemuck::cast_slice;
+use id3::frame::{Picture, PictureType};
+use image::{DynamicImage, ImageFormat};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, SampleBuffer},
     codecs::{CODEC_TYPE_NULL, DecoderOptions},
     errors::Error,
     formats::{FormatOptions, FormatReader},
     io::{MediaSource, MediaSourceStream},
-    meta::MetadataOptions,
+    meta::{MetadataOptions, StandardVisualKey, Visual},
     probe::Hint,
 };
+use walkdir::WalkDir;
 
 use crate::media::MediaSpec;
+
+pub struct FrontCover {
+    mime: String,
+    data: Vec<u8>,
+}
+
+impl FrontCover {
+    pub fn decode(&self) -> anyhow::Result<DynamicImage> {
+        let img = image::ImageReader::with_format(
+            Cursor::new(&self.data),
+            ImageFormat::from_mime_type(&self.mime)
+                .ok_or_else(|| anyhow::anyhow!("image decode error, wrong mime type"))?,
+        )
+        .decode()?;
+
+        Ok(img)
+    }
+}
+
+impl From<&Visual> for FrontCover {
+    fn from(value: &Visual) -> Self {
+        Self {
+            mime: value.media_type.clone(),
+            data: value.data.to_vec(),
+        }
+    }
+}
+
+impl From<&Picture> for FrontCover {
+    fn from(value: &Picture) -> Self {
+        Self {
+            mime: value.mime_type.clone(),
+            data: value.data.clone(),
+        }
+    }
+}
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, thiserror::Error)]
@@ -33,15 +72,19 @@ pub enum DecoderError {
 pub trait Decoder {
     fn decode(&mut self, buf: &mut VecDeque<i32>) -> Result<(), DecoderError>;
     fn spec(&self) -> Option<MediaSpec>;
+    fn cover(&self) -> Option<&FrontCover>;
 }
 
 #[derive(Default)]
-pub struct DecoderManager {
+pub struct MixDecoder {
+    file_path: Option<PathBuf>,
+    cover: Option<FrontCover>,
     decoder: Option<Box<dyn Decoder>>,
 }
 
-impl DecoderManager {
+impl MixDecoder {
     pub fn open(&mut self, p: PathBuf) -> Result<()> {
+        self.file_path = Some(p.clone());
         let mut file = std::fs::File::open(&p)?;
         let is_dsd_file = Self::is_dsd_file(&mut file)?;
         file.seek(std::io::SeekFrom::Start(0))?;
@@ -55,6 +98,11 @@ impl DecoderManager {
             )?)
         };
 
+        self.cover = match decoder.cover() {
+            Some(_) => None,
+            None => self.get_cover(),
+        };
+
         self.decoder.replace(decoder);
         Ok(())
     }
@@ -64,9 +112,36 @@ impl DecoderManager {
         r.read_exact(&mut buf)?;
         Ok(&buf == b"DSD ")
     }
+
+    fn get_cover(&self) -> Option<FrontCover> {
+        let root = self.file_path.as_ref()?.parent()?;
+        let entry = WalkDir::new(root)
+            .into_iter()
+            .flatten()
+            .find(|entry| {
+                let filename = entry.file_name();
+                filename != "cover.jpg" || filename != "cover.png"
+            })
+            .map(|entry| entry.path().to_owned())?;
+
+        let mime = if entry.extension()?.to_str()? == "jpg" {
+            "image/jpg"
+        } else {
+            "image/png"
+        };
+
+        let mut data = Vec::new();
+        let mut file = std::fs::File::open(entry).ok()?;
+        file.read_to_end(&mut data).ok()?;
+
+        Some(FrontCover {
+            mime: mime.to_owned(),
+            data,
+        })
+    }
 }
 
-impl Decoder for DecoderManager {
+impl Decoder for MixDecoder {
     #[inline]
     fn spec(&self) -> Option<MediaSpec> {
         self.decoder.as_ref().and_then(|d| d.spec())
@@ -79,12 +154,19 @@ impl Decoder for DecoderManager {
 
         Ok(())
     }
+
+    fn cover(&self) -> Option<&FrontCover> {
+        self.cover
+            .as_ref()
+            .or_else(|| self.decoder.as_ref().and_then(|d| d.cover()))
+    }
 }
 
 pub struct PcmDecoder {
     format: Box<dyn FormatReader>,
     track_id: u32,
     decoder: Box<dyn symphonia::core::codecs::Decoder>,
+    cover: Option<FrontCover>,
 }
 
 impl PcmDecoder {
@@ -111,7 +193,21 @@ impl PcmDecoder {
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         // Get the instantiated format reader.
-        let format = probed.format;
+        let mut format = probed.format;
+
+        // Get front cover [u8]
+        let mut cover = None;
+        while format.metadata().is_latest() {
+            let revision = format.metadata().pop();
+            if let Some(revision) = revision {
+                cover = revision
+                    .visuals()
+                    .iter()
+                    .find(|v| matches!(v.usage, Some(StandardVisualKey::FrontCover)))
+                    .map(FrontCover::from);
+                break;
+            }
+        }
 
         let track = format
             .tracks()
@@ -133,6 +229,7 @@ impl PcmDecoder {
             format,
             track_id,
             decoder,
+            cover,
         })
     }
 }
@@ -213,11 +310,15 @@ impl Decoder for PcmDecoder {
             }
         }
     }
+
+    fn cover(&self) -> Option<&FrontCover> {
+        self.cover.as_ref()
+    }
 }
 
 pub struct DsdReader<R> {
     spec: MediaSpec,
-    metadata: Option<id3::Tag>,
+    cover: Option<FrontCover>,
     dsd_chunk_size: u64,
     fmt_chunk_size: u64,
     data_chunk_size: u64,
@@ -311,6 +412,13 @@ impl<R: Read + Seek> DsdReader<R> {
             mode: crate::media::OutputMode::DSD,
         };
 
+        let cover = metadata.and_then(|metadata| {
+            metadata
+                .pictures()
+                .find(|p| matches!(p.picture_type, PictureType::CoverFront))
+                .map(FrontCover::from)
+        });
+
         let raw_buffer_size = (block_size_per_ch * spec.channels) as usize;
 
         log::debug!("{:?}", spec);
@@ -320,7 +428,7 @@ impl<R: Read + Seek> DsdReader<R> {
 
         Ok(Self {
             spec,
-            metadata,
+            cover,
             dsd_chunk_size,
             fmt_chunk_size,
             data_chunk_size,
@@ -333,7 +441,9 @@ impl<R: Read + Seek> DsdReader<R> {
     }
 
     pub fn reset(&mut self) -> anyhow::Result<()> {
-        self.reader.seek(SeekFrom::Start(self.dsd_chunk_size + self.fmt_chunk_size + 12))?;
+        self.reader.seek(SeekFrom::Start(
+            self.dsd_chunk_size + self.fmt_chunk_size + 12,
+        ))?;
         Ok(())
     }
 }
@@ -388,6 +498,10 @@ impl<R: Read + Seek> Decoder for DsdReader<R> {
 
     fn spec(&self) -> Option<MediaSpec> {
         Some(self.spec)
+    }
+
+    fn cover(&self) -> Option<&FrontCover> {
+        self.cover.as_ref()
     }
 }
 

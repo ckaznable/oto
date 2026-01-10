@@ -4,3 +4,9 @@ pub enum PlayerCommand {
     Pause,
 }
 
+#[derive(Clone, Copy)]
+pub enum AppCommand {
+    Err(&'static str),
+    End,
+}
+

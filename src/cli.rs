@@ -19,9 +19,12 @@ pub enum Commands {
         device: String,
     },
 
-    PlayList {
-        #[command(subcommand)]
-        command: PlayListCommands,
+    Tui {
+        #[arg(short, long)]
+        path: PathBuf,
+
+        #[arg(short, long)]
+        device: String,
     }
 }
 

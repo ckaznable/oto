@@ -19,7 +19,7 @@ use ringbuf::{
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{
-    decoder::{Decoder, DecoderError, DecoderManager},
+    decoder::{Decoder, DecoderError, MixDecoder},
     media::{MediaSpec, OutputMode},
     shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
@@ -142,7 +142,7 @@ pub type PlayerResult = Result<(), PlayerError>;
 pub struct BufferPlayer {
     rb: LocalRb<Heap<i32>>,
     buf: VecDeque<i32>,
-    dm: DecoderManager,
+    decoder: MixDecoder,
     eof: bool,
     playlist: PlayList,
     pub spec: Option<MediaSpec>,
@@ -153,13 +153,13 @@ impl BufferPlayer {
         let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
         let buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
 
-        let dm = DecoderManager::default();
+        let decoder = MixDecoder::default();
         let playlist = PlayList::new(p);
 
         Ok(Self {
             rb,
             buf,
-            dm,
+            decoder,
             playlist,
             spec: None,
             eof: false,
@@ -167,13 +167,16 @@ impl BufferPlayer {
     }
 
     pub fn init(&mut self) -> Result<()> {
-        let p = self.playlist.current().ok_or(anyhow!("music file not found"))?;
+        let p = self
+            .playlist
+            .current()
+            .ok_or(anyhow!("music file not found"))?;
         self.open(p)
     }
 
     pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {
-        self.dm.open(p.into())?;
-        self.spec = self.dm.spec();
+        self.decoder.open(p.into())?;
+        self.spec = self.decoder.spec();
         Ok(())
     }
 
@@ -239,8 +242,7 @@ impl BufferPlayer {
             return Err(PlayerError::EOF);
         }
 
-        // todo handle if alsa consumer too slow
-        match self.dm.decode(&mut self.buf) {
+        match self.decoder.decode(&mut self.buf) {
             Ok(_) => {
                 let (right, left) = self.buf.as_slices();
                 let wr = output.write_io(right, spec)?;
