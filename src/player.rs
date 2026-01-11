@@ -240,6 +240,7 @@ impl BufferPlayer {
         }
 
         if !self.rb.is_empty() {
+            self.written_sample_count += written as u64;
             return Ok(written);
         }
 
@@ -282,12 +283,17 @@ impl BufferPlayer {
     pub fn calc_duration(&self) -> f64 {
         match self.spec {
             None => 0.,
-            Some(MediaSpec { sample_rate, mode: OutputMode::PCM, .. }) => {
-                self.written_sample_count as f64 / sample_rate as f64
-            }
-            Some(MediaSpec { sample_rate, mode: OutputMode::DSD, .. }) => {
-                self.written_sample_count as f64 * 32. / sample_rate as f64
-            }
+            Some(MediaSpec {
+                sample_rate,
+                mode: OutputMode::PCM,
+                channels,
+                ..
+            }) => self.written_sample_count as f64 / channels as f64 / sample_rate as f64,
+            Some(MediaSpec {
+                sample_rate,
+                mode: OutputMode::DSD,
+                ..
+            }) => self.written_sample_count as f64 * 32. / sample_rate as f64,
         }
     }
 }
