@@ -30,9 +30,15 @@ impl StatefulWidget for StateBar {
 
         let [left, middle, right] = layout.areas(area);
 
+        let mode_color = match state.app_mode.get() {
+            crate::tui::AppMode::Normal => (Color::Reset, Color::Blue),
+            crate::tui::AppMode::Playing => (Color::Black, Color::Green),
+            crate::tui::AppMode::Paused => (Color::Black, Color::Red),
+        };
+
         let line = Line::from(vec![
-            Span::styled(format!(" {app_mode_str} "), Style::new().bg(Color::Green)),
-            Span::styled("", Style::new().fg(Color::Green)),
+            Span::styled(format!(" {app_mode_str} "), Style::new().fg(mode_color.0).bg(mode_color.1)),
+            Span::styled("", Style::new().fg(mode_color.1)),
         ]);
         line.render(left, buf);
 

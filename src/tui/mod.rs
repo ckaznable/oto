@@ -20,7 +20,7 @@ pub enum AppMode {
     #[default]
     Normal,
     Playing,
-    Pause,
+    Paused,
 }
 
 #[derive(Clone, Copy, Default)]

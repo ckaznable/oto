@@ -78,7 +78,7 @@ fn player(
                     output.pause(pause)?;
 
                     tx.send(AppCommand::AppModeUpdate(match pause {
-                        true => oto::tui::AppMode::Pause,
+                        true => oto::tui::AppMode::Paused,
                         false => oto::tui::AppMode::Playing,
                     }))
                     .ok();
