@@ -22,6 +22,7 @@ fn main() -> Result<()> {
 
     match args.command {
         cli::Commands::Play { path, device } => {
+            spawn_mock_app_event_handler(app_rx);
             player(path, device, app_tx, player_rx)
         }
         cli::Commands::Tui { path, device } => {
@@ -36,12 +37,21 @@ fn main() -> Result<()> {
             std::thread::spawn(enclose!((app_tx) move || {
                 if let Err(e) = player(path, device, app_tx.clone(), player_rx) {
                     app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
+                    log::error!("{e:?}");
                 }
             }));
 
             oto::tui::tui(player_tx, app_tx, app_rx)
         }
     }
+}
+
+fn spawn_mock_app_event_handler(rx: Receiver<AppCommand>) {
+    std::thread::spawn(move || {
+        loop {
+            let _ = rx.recv();
+        }
+    });
 }
 
 fn player(
