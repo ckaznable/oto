@@ -70,9 +70,11 @@ fn player(
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
                 PlayerCommand::PauseCycle => {
-                    let state = output.state();
+                    if matches!(output.state(), State::Suspended) {
+                        output.resume()?;
+                    }
 
-                    let pause = matches!(state, State::Running);
+                    let pause = !matches!(output.state(), State::Paused);
                     output.pause(pause)?;
 
                     tx.send(AppCommand::AppModeUpdate(match pause {
@@ -84,8 +86,13 @@ fn player(
             }
         }
 
+        if matches!(output.state(), State::Paused) {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            continue;
+        }
+
         output.wait(Some(32))?;
-        if !matches!(output.state(), State::Running | State::Prepared) {
+        if !matches!(output.state(), State::Running | State::Prepared | State::Paused) {
             output.prepare()?;
         }
 

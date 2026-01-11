@@ -104,7 +104,7 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>,) {
     loop {
         match crossterm::event::read() {
             Ok(Event::Key(event)) => match event {
-                KeyEvent { code: KeyCode::Char('Q'), .. } => {
+                KeyEvent { code: KeyCode::Char('q'), .. } => {
                     tx.send(AppCommand::End).ok();
                 }
                 KeyEvent { code: KeyCode::Char(' '), .. } => {
