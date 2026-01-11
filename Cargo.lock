@@ -1199,6 +1199,7 @@ dependencies = [
  "ratatui-image",
  "ringbuf",
  "simplelog",
+ "strum",
  "symphonia",
  "thiserror 2.0.17",
  "walkdir",

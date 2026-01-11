@@ -20,6 +20,7 @@ simplelog = "0.12.2"
 symphonia = { version = "0.5.5", features = ["all-codecs"]}
 thiserror = "2.0.17"
 walkdir = "2.5.0"
+strum = { version = "0.27", features = ["derive"] }
 
 [profile.release]
 opt-level = "z"
