@@ -197,7 +197,7 @@ impl PcmDecoder {
 
         // Get front cover [u8]
         let mut cover = None;
-        while format.metadata().is_latest() {
+        while !format.metadata().is_latest() {
             let revision = format.metadata().pop();
             if let Some(revision) = revision {
                 cover = revision

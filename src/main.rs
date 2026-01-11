@@ -22,7 +22,6 @@ fn main() -> Result<()> {
 
     match args.command {
         cli::Commands::Play { path, device } => {
-            player_tx.send(PlayerCommand::PauseCycle).ok();
             player(path, device, app_tx, player_rx)
         }
         cli::Commands::Tui { path, device } => {
@@ -62,9 +61,6 @@ fn player(
             match cmd {
                 PlayerCommand::PauseCycle => {
                     let state = output.state();
-                    if !matches!(state, State::Running | State::Paused) {
-                        output.start()?;
-                    }
 
                     let pause = matches!(state, State::Running);
                     output.pause(pause)?;
@@ -91,6 +87,10 @@ fn player(
 
         if let Err(PlayerError::EOF) = player.consume(&mut output) {
             break;
+        }
+
+        if !matches!(output.state(), State::Running | State::Paused) {
+            output.start()?;
         }
     }
 
