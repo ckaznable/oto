@@ -66,8 +66,13 @@ pub fn tui(
 fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Result<()> {
     let state = AppState::new();
 
+    let mut draw = true;
     loop {
-        terminal.draw(enclose!((state) move |f| render(f, state)))?;
+        if draw {
+            terminal.draw(enclose!((state) move |f| render(f, state)))?;
+        }
+
+        draw = true;
         match rx.recv() {
             Err(_) => break Ok(()),
             Ok(event) => match event {
@@ -75,10 +80,15 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::Unexcepted(e) => log::error!("{e}"),
                 AppCommand::End => break Ok(()),
                 AppCommand::TimeUpdate(current, duration) => {
-                    state.playing.set(PlayingState {
+                    state.app_mode.set(AppMode::Playing);
+                    let last = state.playing.replace(PlayingState {
                         current,
                         duration: duration.unwrap_or(0),
-                    })
+                    });
+
+                    if last.current.floor() == current.floor() {
+                        draw = false;
+                    }
                 }
                 AppCommand::AppModeUpdate(mode) => {
                     state.app_mode.set(mode);
