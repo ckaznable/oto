@@ -7,7 +7,7 @@ use std::{
 };
 
 use ratatui::{
-    DefaultTerminal, Frame, crossterm::{self, event::Event},
+    DefaultTerminal, Frame, crossterm::{self, event::{Event, KeyCode, KeyEvent}},
     layout::{Constraint, Layout},
 };
 
@@ -33,8 +33,8 @@ pub enum PlayMode {
 
 #[derive(Clone, Copy, Default)]
 pub struct PlayingState {
-    current: usize,
-    duration: usize,
+    current: f64,
+    duration: u64,
 }
 
 #[derive(Clone, Default)]
@@ -58,21 +58,31 @@ pub fn tui(
     tx: Sender<AppCommand>,
     rx: Receiver<AppCommand>,
 ) -> anyhow::Result<()> {
-    std::thread::spawn(enclose!((tx) move || handle_keypress(tx)));
+    std::thread::spawn(enclose!((tx) move || handle_keypress(tx, player_tx)));
     ratatui::run(move |t| app(t, rx))?;
     Ok(())
 }
 
 fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Result<()> {
-    let status = AppState::new();
+    let state = AppState::new();
 
     loop {
-        terminal.draw(enclose!((status) move |f| render(f, status)))?;
+        terminal.draw(enclose!((state) move |f| render(f, state)))?;
         match rx.recv() {
             Err(_) => break Ok(()),
             Ok(event) => match event {
                 AppCommand::Err(e) => log::error!("{e}"),
+                AppCommand::Unexcepted(e) => log::error!("{e}"),
                 AppCommand::End => break Ok(()),
+                AppCommand::TimeUpdate(current, duration) => {
+                    state.playing.set(PlayingState {
+                        current,
+                        duration: duration.unwrap_or(0),
+                    })
+                }
+                AppCommand::AppModeUpdate(mode) => {
+                    state.app_mode.set(mode);
+                }
             },
         }
     }
@@ -90,13 +100,19 @@ fn render(frame: &mut Frame, mut state: AppState) {
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 
-fn handle_keypress(tx: Sender<AppCommand>) {
+fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>,) {
     loop {
         match crossterm::event::read() {
-            Ok(Event::Key(_)) => {
-                tx.send(AppCommand::End).ok();
+            Ok(Event::Key(event)) => match event {
+                KeyEvent { code: KeyCode::Char('Q'), .. } => {
+                    tx.send(AppCommand::End).ok();
+                }
+                KeyEvent { code: KeyCode::Char(' '), .. } => {
+                    player_tx.send(PlayerCommand::PauseCycle).ok();
+                }
+                _ => {}
             },
-            Err(e) => {
+            Err(_) => {
                 tx.send(AppCommand::Err("crossterm event reader error occurred"))
                     .ok();
             }

@@ -56,7 +56,7 @@ impl StatefulWidget for StateBar {
 
         let playing = state.playing.get();
         let duration = format!("{:02}:{:02}", playing.duration / 60, playing.duration % 60);
-        let current = format!("{:02}:{:02}", playing.current / 60, playing.current % 60);
+        let current = format!("{:02.0}:{:02.0}", playing.current / 60., playing.current % 60.);
         let layout = Layout::horizontal([Constraint::Length(11)]).flex(Flex::Center);
         let [progress] = layout.areas(middle);
         let line = Line::from(vec![Span::styled(

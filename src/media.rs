@@ -28,6 +28,7 @@ pub struct Album {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MediaSpec {
     pub sample_rate: u32,
+    pub duration: Option<u64>,
     pub channels: u32,
     pub mode: OutputMode,
 }

@@ -22,25 +22,35 @@ fn main() -> Result<()> {
 
     match args.command {
         cli::Commands::Play { path, device } => {
-            player_tx.send(PlayerCommand::Resume).ok();
+            player_tx.send(PlayerCommand::PauseCycle).ok();
             player(path, device, app_tx, player_rx)
         }
         cli::Commands::Tui { path, device } => {
             WriteLogger::init(
-                    LevelFilter::Info,
-                    simplelog::Config::default(),
-                    std::fs::File::create("/tmp/oto.log").unwrap(),
-                ).unwrap();
+                LevelFilter::Info,
+                simplelog::Config::default(),
+                std::fs::File::create("/tmp/oto.log").unwrap(),
+            )
+            .unwrap();
 
-            // use enclose::enclose;
-            // std::thread::spawn(enclose!((app_tx) move || player(path, device, app_tx, player_rx)));
+            use enclose::enclose;
+            std::thread::spawn(enclose!((app_tx) move || {
+                if let Err(e) = player(path, device, app_tx.clone(), player_rx) {
+                    app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
+                }
+            }));
 
             oto::tui::tui(player_tx, app_tx, app_rx)
         }
     }
 }
 
-fn player(path: impl Into<PathBuf>, device: String, tx: Sender<AppCommand>, rx: Receiver<PlayerCommand>) -> Result<()> {
+fn player(
+    path: impl Into<PathBuf>,
+    device: String,
+    tx: Sender<AppCommand>,
+    rx: Receiver<PlayerCommand>,
+) -> Result<()> {
     let mut player = BufferPlayer::new(path)?;
     player.init()?;
 
@@ -50,15 +60,20 @@ fn player(path: impl Into<PathBuf>, device: String, tx: Sender<AppCommand>, rx: 
     loop {
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
-                PlayerCommand::Resume => {
-                    if !matches!(output.state(), State::Running | State::Paused) {
+                PlayerCommand::PauseCycle => {
+                    let state = output.state();
+                    if !matches!(state, State::Running | State::Paused) {
                         output.start()?;
                     }
 
-                    output.pause(false)?;
-                }
-                PlayerCommand::Pause => {
-                    output.pause(true)?;
+                    let pause = matches!(state, State::Running);
+                    output.pause(pause)?;
+
+                    tx.send(AppCommand::AppModeUpdate(match pause {
+                        true => oto::tui::AppMode::Pause,
+                        false => oto::tui::AppMode::Playing,
+                    }))
+                    .ok();
                 }
             }
         }
@@ -68,6 +83,12 @@ fn player(path: impl Into<PathBuf>, device: String, tx: Sender<AppCommand>, rx: 
             output.prepare()?;
         }
 
+        tx.send(AppCommand::TimeUpdate(
+            player.calc_duration(),
+            player.spec.and_then(|s| s.duration),
+        ))
+        .ok();
+
         if let Err(PlayerError::EOF) = player.consume(&mut output) {
             break;
         }
@@ -76,4 +97,3 @@ fn player(path: impl Into<PathBuf>, device: String, tx: Sender<AppCommand>, rx: 
     output.drain()?;
     Ok(())
 }
-

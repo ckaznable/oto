@@ -217,7 +217,6 @@ impl PcmDecoder {
 
         // Use the default options for the decoder.
         let dec_opts = DecoderOptions::default();
-
         // Create a decoder for the track.
         let decoder = symphonia::default::get_codecs().make(&track.codec_params, &dec_opts)?;
 
@@ -237,8 +236,10 @@ impl PcmDecoder {
 impl Decoder for PcmDecoder {
     fn spec(&self) -> Option<MediaSpec> {
         let params = self.decoder.codec_params();
+        let sample_rate = params.sample_rate?;
         Some(MediaSpec {
-            sample_rate: params.sample_rate?,
+            sample_rate,
+            duration: params.n_frames.map(|s| s / sample_rate as u64),
             channels: params.channels.map(|c| c.count() as u32)?,
             mode: crate::media::OutputMode::PCM,
         })
@@ -332,7 +333,6 @@ pub struct DsdReader<R> {
 impl<R: Read + Seek> DsdReader<R> {
     pub fn new(mut reader: R) -> Result<Self> {
         let mut u32_buf = [0u8; 4];
-        let mut u64_buf = [0u8; 8];
         let mut dsd_chunk_size_buf = [0u8; 8];
         let mut fmt_chunk_size_buf = [0u8; 8];
         let mut data_chunk_size_buf = [0u8; 8];
@@ -342,6 +342,7 @@ impl<R: Read + Seek> DsdReader<R> {
         let mut sample_freq_buf = [0u8; 4];
         let mut block_size_per_ch_buf = [0u8; 4];
         let mut bit_per_sample_buf = [0u8; 4];
+        let mut total_sample_count_buf = [0u8; 8];
 
         // 'DSD '
         reader.read_exact(&mut u32_buf)?;
@@ -374,7 +375,7 @@ impl<R: Read + Seek> DsdReader<R> {
         // bit per sample
         reader.read_exact(&mut bit_per_sample_buf)?;
         // sample count
-        reader.read_exact(&mut u64_buf)?;
+        reader.read_exact(&mut total_sample_count_buf)?;
         // block size per channel
         reader.read_exact(&mut block_size_per_ch_buf)?;
         // reserved
@@ -394,6 +395,8 @@ impl<R: Read + Seek> DsdReader<R> {
         let file_size = u64::from_le_bytes(file_size_buf);
         let block_size_per_ch = u32::from_le_bytes(block_size_per_ch_buf);
         let bit_per_sample = u32::from_le_bytes(bit_per_sample_buf);
+        let total_sample_count = u64::from_le_bytes(total_sample_count_buf);
+        let sample_rate = u32::from_le_bytes(sample_freq_buf);
         let dsd_size = dsd_chunk_size + fmt_chunk_size + data_chunk_size;
         if dsd_size > file_size {
             return Err(anyhow!("dsd file parser error"));
@@ -407,7 +410,8 @@ impl<R: Read + Seek> DsdReader<R> {
 
         let metadata = id3::v1v2::read_from(Cursor::new(metadata)).ok();
         let spec = MediaSpec {
-            sample_rate: u32::from_le_bytes(sample_freq_buf),
+            sample_rate,
+            duration: Some(total_sample_count / sample_rate as u64),
             channels: u32::from_le_bytes(channel_num_buf),
             mode: crate::media::OutputMode::DSD,
         };
@@ -420,8 +424,6 @@ impl<R: Read + Seek> DsdReader<R> {
         });
 
         let raw_buffer_size = (block_size_per_ch * spec.channels) as usize;
-
-        log::debug!("{:?}", spec);
 
         // reset reader to data position
         reader.seek(SeekFrom::Start(dsd_chunk_size + fmt_chunk_size + 12))?;

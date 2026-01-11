@@ -137,7 +137,7 @@ impl From<anyhow::Error> for PlayerError {
     }
 }
 
-pub type PlayerResult = Result<(), PlayerError>;
+pub type PlayerResult = Result<usize, PlayerError>;
 
 pub struct BufferPlayer {
     rb: LocalRb<Heap<i32>>,
@@ -145,6 +145,7 @@ pub struct BufferPlayer {
     decoder: MixDecoder,
     eof: bool,
     playlist: PlayList,
+    written_sample_count: u64,
     pub spec: Option<MediaSpec>,
 }
 
@@ -163,6 +164,7 @@ impl BufferPlayer {
             playlist,
             spec: None,
             eof: false,
+            written_sample_count: 0,
         })
     }
 
@@ -177,6 +179,7 @@ impl BufferPlayer {
     pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {
         self.decoder.open(p.into())?;
         self.spec = self.decoder.spec();
+        self.written_sample_count = 0;
         Ok(())
     }
 
@@ -211,6 +214,8 @@ impl BufferPlayer {
     }
 
     pub fn consume(&mut self, output: &mut AudioOutput) -> PlayerResult {
+        let mut written = 0usize;
+
         let Some(spec) = self.spec else {
             return Err(PlayerError::DecoderNotInit);
         };
@@ -221,6 +226,7 @@ impl BufferPlayer {
             let wr = output.write_io(right, spec)?;
             let wl = output.write_io(left, spec)?;
             self.rb.skip(wr + wl);
+            written += wr + wl;
         }
 
         if !self.buf.is_empty() {
@@ -234,10 +240,9 @@ impl BufferPlayer {
         }
 
         if !self.rb.is_empty() {
-            return Ok(());
+            return Ok(written);
         }
 
-        // todo return eof event to controller
         if self.rb.is_empty() && self.eof {
             return Err(PlayerError::EOF);
         }
@@ -248,6 +253,7 @@ impl BufferPlayer {
                 let wr = output.write_io(right, spec)?;
                 let wl = output.write_io(left, spec)?;
                 self.buf.drain(..(wr + wl));
+                written += wr + wl;
 
                 // push remaining decoded data to rb
                 if !self.buf.is_empty() {
@@ -269,7 +275,20 @@ impl BufferPlayer {
             _ => {}
         }
 
-        Ok(())
+        self.written_sample_count += written as u64;
+        Ok(written)
+    }
+
+    pub fn calc_duration(&self) -> f64 {
+        match self.spec {
+            None => 0.,
+            Some(MediaSpec { sample_rate, mode: OutputMode::PCM, .. }) => {
+                self.written_sample_count as f64 / sample_rate as f64
+            }
+            Some(MediaSpec { sample_rate, mode: OutputMode::DSD, .. }) => {
+                self.written_sample_count as f64 * 32. / sample_rate as f64
+            }
+        }
     }
 }
 
