@@ -23,7 +23,7 @@ fn main() -> Result<()> {
     match args.command {
         cli::Commands::Play { path, device } => {
             spawn_mock_app_event_handler(app_rx);
-            player(path, device, app_tx, player_rx)
+            player_event_loop(path, device, app_tx, player_rx)
         }
         cli::Commands::Tui { path, device } => {
             WriteLogger::init(
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
 
             use enclose::enclose;
             std::thread::spawn(enclose!((app_tx) move || {
-                if let Err(e) = player(path, device, app_tx.clone(), player_rx) {
+                if let Err(e) = player_event_loop(path, device, app_tx.clone(), player_rx) {
                     app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
                     log::error!("{e:?}");
                 }
@@ -54,7 +54,7 @@ fn spawn_mock_app_event_handler(rx: Receiver<AppCommand>) {
     });
 }
 
-fn player(
+fn player_event_loop(
     path: impl Into<PathBuf>,
     device: String,
     tx: Sender<AppCommand>,
