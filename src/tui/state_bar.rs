@@ -4,7 +4,7 @@ use ratatui::{
     widgets::StatefulWidget,
 };
 
-use crate::tui::{AppState, PlayMode};
+use crate::tui::AppState;
 
 pub struct StateBar;
 
@@ -26,7 +26,7 @@ impl StatefulWidget for StateBar {
         let app_mode_len = app_mode_str.len() + 3;
 
         let playing = state.playing.get();
-        let current_time = format!(" {:02.0}:{:02.0} ", playing.current / 60., playing.current % 60.);
+        let current_time = format!(" {:02}:{:02.0} ", (playing.current / 60.).floor(), (playing.current % 60.).floor());
         let timer_len = current_time.len() + 1;
 
         let layout = Layout::horizontal([

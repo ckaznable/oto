@@ -97,7 +97,10 @@ fn player_event_loop(
         }
 
         tx.send(AppCommand::TimeUpdate(
-            player.calc_duration(),
+            player.calc_duration(match output.delay() {
+                Ok(d) => d as u64,
+                Err(_) => 0,
+            }),
             player.spec.and_then(|s| s.duration),
         ))
         .ok();

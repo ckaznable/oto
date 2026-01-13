@@ -77,13 +77,10 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::End => break Ok(()),
                 AppCommand::TimeUpdate(current, duration) => {
                     state.app_mode.set(AppMode::Playing);
-                    let last = state.playing.replace(PlayingState {
+                    state.playing.set(PlayingState {
                         current,
                         duration: duration.unwrap_or(0),
                     });
-
-                    if last.current.floor() == current.floor() {
-                    }
                 }
                 AppCommand::AppModeUpdate(mode) => {
                     state.app_mode.set(mode);

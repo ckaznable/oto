@@ -280,21 +280,24 @@ impl BufferPlayer {
         Ok(written)
     }
 
-    pub fn calc_duration(&self) -> f64 {
-        match self.spec {
-            None => 0.,
+    pub fn calc_duration(&self, delay: u64) -> f64 {
+        let (written_frames, sample_rate) = match self.spec {
+            None => return 0.,
             Some(MediaSpec {
                 sample_rate,
                 mode: OutputMode::PCM,
                 channels,
                 ..
-            }) => self.written_sample_count as f64 / channels as f64 / sample_rate as f64,
+            }) => (self.written_sample_count / channels as u64, sample_rate),
             Some(MediaSpec {
                 sample_rate,
                 mode: OutputMode::DSD,
                 ..
-            }) => self.written_sample_count as f64 * 32. / sample_rate as f64,
-        }
+            }) => (self.written_sample_count * 32, sample_rate),
+        };
+
+        let actual_played_frames = written_frames.saturating_sub(delay);
+        actual_played_frames as f64 / sample_rate as f64
     }
 }
 
