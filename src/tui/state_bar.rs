@@ -110,24 +110,15 @@ impl StatefulWidget for ProgressBar {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let playing = state.playing.get();
-        let progress = (playing.current / playing.duration as f64) * 100.;
-        let percent_per_cell = 100. / area.width as f64;
-        for i in 0..area.width {
-            let mut cell_width = 0u8;
-            let current_cell_width = percent_per_cell * i as f64;
-            if current_cell_width < progress {
-                cell_width = 8;
-            }
+        let ratio = (playing.current / playing.duration as f64).clamp(0.0, 1.0);
+        let available_width = area.width as f64;
+        let filled_width = available_width * ratio;
 
-            if current_cell_width > progress && current_cell_width - progress < percent_per_cell {
-                cell_width = ((current_cell_width - progress) as u32 % 8) as u8;
-            }
-
-            if cell_width == 0 {
-                break;
-            }
-
-            self.draw_cell(area.x + i, area.y, buf, cell_width);
+        let full_blocks = filled_width.floor() as u16;
+        for i in 0..full_blocks {
+            self.draw_cell(area.x + i, area.y, buf, 8);
         }
+        let fraction = filled_width - filled_width.floor();
+        self.draw_cell(area.x + full_blocks, area.y, buf, (fraction * 8.0) as u8);
     }
 }

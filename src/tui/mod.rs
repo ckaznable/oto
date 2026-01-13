@@ -66,13 +66,9 @@ pub fn tui(
 fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Result<()> {
     let state = AppState::new();
 
-    let mut draw = true;
     loop {
-        if draw {
-            terminal.draw(enclose!((state) move |f| render(f, state)))?;
-        }
+        terminal.draw(enclose!((state) move |f| render(f, state)))?;
 
-        draw = true;
         match rx.recv() {
             Err(_) => break Ok(()),
             Ok(event) => match event {
@@ -87,7 +83,6 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                     });
 
                     if last.current.floor() == current.floor() {
-                        draw = false;
                     }
                 }
                 AppCommand::AppModeUpdate(mode) => {
