@@ -4,7 +4,7 @@ use ratatui::{
     widgets::StatefulWidget,
 };
 
-use crate::tui::AppState;
+use crate::tui::{AppState, PlayMode};
 
 pub struct StateBar;
 
@@ -50,9 +50,15 @@ impl StatefulWidget for StateBar {
         ]);
         line.render(left, buf);
 
+        let arrow_bg = if state.playing.get().current > 0. {
+            Color::White
+        } else {
+            Color::Reset
+        };
+
         let line = Line::from(vec![
             Span::styled(current_time, Style::new().bg(timer_color).fg(Color::Black)),
-            Span::styled("", Style::new().fg(timer_color).bg(Color::White)),
+            Span::styled("", Style::new().fg(timer_color).bg(arrow_bg)),
         ]);
         line.render(Rect {
             x: left.x + app_mode_len as u16,
