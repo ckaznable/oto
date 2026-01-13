@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Flex, Layout},
+    layout::{Constraint, Layout},
     prelude::*,
     widgets::StatefulWidget,
 };
@@ -21,11 +21,18 @@ impl StatefulWidget for StateBar {
         };
 
         let vol_str = format!(" {} {}% ", vol_icon, state.volumn.get());
+        let vol_len = vol_str.len() + 2;
+
+        let app_mode_len = app_mode_str.len() + 3;
+
+        let playing = state.playing.get();
+        let current_time = format!(" {:02.0}:{:02.0} ", playing.current / 60., playing.current % 60.);
+        let timer_len = current_time.len() + 1;
 
         let layout = Layout::horizontal([
-            Constraint::Length((app_mode_str.len() + 3) as u16),
+            Constraint::Length((app_mode_len + timer_len) as u16),
             Constraint::Fill(1),
-            Constraint::Length((vol_str.len() + 2) as u16),
+            Constraint::Length(vol_len as u16),
         ]);
 
         let [left, middle, right] = layout.areas(area);
@@ -35,12 +42,24 @@ impl StatefulWidget for StateBar {
             crate::tui::AppMode::Playing => (Color::Black, Color::Green),
             crate::tui::AppMode::Paused => (Color::Black, Color::Red),
         };
+        let timer_color = Color::Magenta;
 
         let line = Line::from(vec![
             Span::styled(format!(" {app_mode_str} "), Style::new().fg(mode_color.0).bg(mode_color.1)),
-            Span::styled("", Style::new().fg(mode_color.1)),
+            Span::styled("", Style::new().fg(mode_color.1).bg(timer_color)),
         ]);
         line.render(left, buf);
+
+        let line = Line::from(vec![
+            Span::styled(current_time, Style::new().bg(timer_color).fg(Color::Black)),
+            Span::styled("", Style::new().fg(timer_color).bg(Color::White)),
+        ]);
+        line.render(Rect {
+            x: left.x + app_mode_len as u16,
+            y: left.y,
+            width: timer_len as u16,
+            height: 1,
+        }, buf);
 
         let layout = Layout::horizontal([
             Constraint::Length(3),
@@ -61,17 +80,6 @@ impl StatefulWidget for StateBar {
         line.render(left, buf);
 
         ProgressBar.render(middle, buf, state);
-        let playing = state.playing.get();
-        let duration = format!("{:02}:{:02}", playing.duration / 60, playing.duration % 60);
-        let current = format!("{:02.0}:{:02.0}", playing.current / 60., playing.current % 60.);
-        let layout = Layout::horizontal([Constraint::Length(11)]).flex(Flex::Center);
-        let [timer] = layout.areas(middle);
-        let line = Line::from(vec![Span::styled(
-            format!("{}/{}", current, duration),
-            Style::new().fg(Color::White),
-        )]);
-
-        line.render(timer, buf);
     }
 }
 
@@ -103,16 +111,16 @@ impl StatefulWidget for ProgressBar {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let playing = state.playing.get();
         let progress = (playing.current / playing.duration as f64) * 100.;
-        let percent_per_cell = 100. / area.width as f32;
+        let percent_per_cell = 100. / area.width as f64;
         for i in 0..area.width {
             let mut cell_width = 0u8;
-            let current_cell_width = percent_per_cell * i;
+            let current_cell_width = percent_per_cell * i as f64;
             if current_cell_width < progress {
                 cell_width = 8;
             }
 
             if current_cell_width > progress && current_cell_width - progress < percent_per_cell {
-                cell_width = (current_cell_width - progress) % 8;
+                cell_width = ((current_cell_width - progress) as u32 % 8) as u8;
             }
 
             if cell_width == 0 {
