@@ -14,13 +14,13 @@ impl StatefulWidget for StateBar {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let app_mode_str = state.app_mode.get().to_string();
 
-        let vol_icon = match state.volumn.get() {
+        let vol_icon = match state.volume.get() {
             0 => "",
             1..50 => "",
             _ => "",
         };
 
-        let vol_str = format!(" {} {}% ", vol_icon, state.volumn.get());
+        let vol_str = format!(" {} {}% ", vol_icon, state.volume.get());
         let vol_len = vol_str.len() + 2;
 
         let app_mode_len = app_mode_str.len() + 3;
