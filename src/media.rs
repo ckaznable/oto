@@ -1,5 +1,4 @@
-pub const DEFAULT_ALBUM_NAME: &str = "Unknown Album";
-pub const DEFAULT_ALBUM_ID: i32 = 1;
+use std::path::PathBuf;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -8,21 +7,11 @@ pub enum OutputMode {
     DSD,
 }
 
-#[derive(Clone, Debug)]
-pub struct Media {
-    pub file_path: String,
-    pub album: Album,
-    pub name: String,
-    pub artist: String,
-    pub track: u8,
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Album {
-    pub name: String,
-    pub year: u16,
-    pub track: u8,
-    pub cover: String,
+    pub name: Option<String>,
+    pub year: Option<u32>,
+    pub track: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,3 +22,20 @@ pub struct MediaSpec {
     pub mode: OutputMode,
 }
 
+#[derive(Clone, Default, Debug)]
+pub struct TrackMeta {
+   pub path: PathBuf,
+   pub title: Option<String>,
+   pub artist: Option<String>,
+   pub album: Album,
+   pub duration_secs: u64,
+}
+
+impl TrackMeta {
+    pub fn empty(path: PathBuf) -> Self {
+        Self {
+            path,
+            ..Default::default()
+        }
+    }
+}

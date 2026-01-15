@@ -11,16 +11,18 @@ use alsa::{
     pcm::{HwParams, State},
 };
 use bytemuck::cast_slice;
+use lofty::{file::{AudioFile, TaggedFileExt}, probe::Probe, tag::Accessor};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ringbuf::{
     LocalRb,
     storage::Heap,
     traits::{Consumer, Observer, Producer},
 };
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 use crate::{
     decoder::{Decoder, DecoderError, MixDecoder},
-    media::{MediaSpec, OutputMode},
+    media::{Album, MediaSpec, OutputMode, TrackMeta},
     shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
 
@@ -308,7 +310,7 @@ impl BufferPlayer {
 
 #[derive(Clone)]
 pub struct PlayList {
-    list: Vec<PathBuf>,
+    list: Vec<TrackMeta>,
     index: usize,
 }
 
@@ -325,9 +327,9 @@ impl PlayList {
         }
 
         if p.is_file() {
-            list.list.push(p);
+            list.list.push(TrackMeta::empty(p));
         } else {
-            list.list = all_media_path(&p);
+            list.list = scan_music_library(&p);
         }
 
         list
@@ -341,17 +343,17 @@ impl PlayList {
         }
 
         self.index = next;
-        self.list.get(next).cloned()
+        self.list.get(next).map(|p| p.path.clone())
     }
 
     pub fn prev(&mut self) -> Option<PathBuf> {
         self.index = self.index.saturating_sub(1);
-        self.list.get(self.index).cloned()
+        self.list.get(self.index).map(|m| m.path.to_owned())
     }
 
     #[inline]
     pub fn current(&self) -> Option<PathBuf> {
-        self.list.get(self.index).cloned()
+        self.list.get(self.index).map(|m| m.path.to_owned())
     }
 
     #[inline]
@@ -360,16 +362,43 @@ impl PlayList {
     }
 }
 
-fn all_media_path(p: &Path) -> Vec<PathBuf> {
-    WalkDir::new(p)
+pub fn scan_music_library(root_path: &Path) -> Vec<TrackMeta> {
+    let files: Vec<_> = WalkDir::new(root_path)
         .into_iter()
-        .flatten()
-        .filter(is_media_file)
-        .map(|e| e.into_path())
-        .collect()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "flac"))
+        .collect();
+
+    let tracks: Vec<TrackMeta> = files
+        .par_iter()
+        .map(|entry| {
+            let path = entry.path();
+            parse_one_file(path)
+        })
+        .filter_map(|res| res)
+        .collect();
+
+    tracks
 }
 
-fn is_media_file(e: &DirEntry) -> bool {
-    let p = e.path().extension().and_then(|s| s.to_str());
-    matches!(p, Some("flac" | "wav" | "ogg" | "aac" | "mp3" | "dsf"))
+pub fn parse_one_file(path: &Path) -> Option<TrackMeta> {
+    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+
+    let tag = tagged_file
+        .primary_tag()
+        .or_else(|| tagged_file.first_tag())?;
+
+    let properties = tagged_file.properties();
+
+    Some(TrackMeta {
+        path: path.to_owned(),
+        title: tag.title().map(|t| t.to_string()),
+        artist: tag.artist().map(|a| a.to_string()),
+        album: Album {
+            name: tag.album().map(|a| a.to_string()),
+            year: tag.year(),
+            track: tag.track(),
+        },
+        duration_secs: properties.duration().as_secs(),
+    })
 }

@@ -7,7 +7,10 @@ use std::{
 use anyhow::{Result, anyhow};
 
 use bytemuck::cast_slice;
-use id3::frame::{Picture, PictureType};
+use id3::{
+    Tag,
+    frame::{Picture, PictureType},
+};
 use image::{DynamicImage, ImageFormat};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, SampleBuffer},
@@ -15,7 +18,7 @@ use symphonia::core::{
     errors::Error,
     formats::{FormatOptions, FormatReader},
     io::{MediaSource, MediaSourceStream},
-    meta::{MetadataOptions, StandardVisualKey, Visual},
+    meta::{MetadataOptions, Visual},
     probe::Hint,
 };
 use walkdir::WalkDir;
@@ -72,13 +75,12 @@ pub enum DecoderError {
 pub trait Decoder {
     fn decode(&mut self, buf: &mut VecDeque<i32>) -> Result<(), DecoderError>;
     fn spec(&self) -> Option<MediaSpec>;
-    fn cover(&self) -> Option<&FrontCover>;
+    fn cover(&self) -> Option<FrontCover>;
 }
 
 #[derive(Default)]
 pub struct MixDecoder {
     file_path: Option<PathBuf>,
-    cover: Option<FrontCover>,
     decoder: Option<Box<dyn Decoder>>,
 }
 
@@ -96,11 +98,6 @@ impl MixDecoder {
                 file,
                 p.extension().and_then(|e| e.to_str()),
             )?)
-        };
-
-        self.cover = match decoder.cover() {
-            Some(_) => None,
-            None => self.get_cover(),
         };
 
         self.decoder.replace(decoder);
@@ -155,9 +152,8 @@ impl Decoder for MixDecoder {
         Ok(())
     }
 
-    fn cover(&self) -> Option<&FrontCover> {
-        self.cover
-            .as_ref()
+    fn cover(&self) -> Option<FrontCover> {
+        self.get_cover()
             .or_else(|| self.decoder.as_ref().and_then(|d| d.cover()))
     }
 }
@@ -166,7 +162,6 @@ pub struct PcmDecoder {
     format: Box<dyn FormatReader>,
     track_id: u32,
     decoder: Box<dyn symphonia::core::codecs::Decoder>,
-    cover: Option<FrontCover>,
 }
 
 impl PcmDecoder {
@@ -193,21 +188,7 @@ impl PcmDecoder {
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         // Get the instantiated format reader.
-        let mut format = probed.format;
-
-        // Get front cover [u8]
-        let mut cover = None;
-        while !format.metadata().is_latest() {
-            let revision = format.metadata().pop();
-            if let Some(revision) = revision {
-                cover = revision
-                    .visuals()
-                    .iter()
-                    .find(|v| matches!(v.usage, Some(StandardVisualKey::FrontCover)))
-                    .map(FrontCover::from);
-                break;
-            }
-        }
+        let format = probed.format;
 
         let track = format
             .tracks()
@@ -228,7 +209,6 @@ impl PcmDecoder {
             format,
             track_id,
             decoder,
-            cover,
         })
     }
 }
@@ -312,14 +292,14 @@ impl Decoder for PcmDecoder {
         }
     }
 
-    fn cover(&self) -> Option<&FrontCover> {
-        self.cover.as_ref()
+    fn cover(&self) -> Option<FrontCover> {
+        None
     }
 }
 
 pub struct DsdReader<R> {
     spec: MediaSpec,
-    cover: Option<FrontCover>,
+    metadata: Option<Tag>,
     dsd_chunk_size: u64,
     fmt_chunk_size: u64,
     data_chunk_size: u64,
@@ -416,13 +396,6 @@ impl<R: Read + Seek> DsdReader<R> {
             mode: crate::media::OutputMode::DSD,
         };
 
-        let cover = metadata.and_then(|metadata| {
-            metadata
-                .pictures()
-                .find(|p| matches!(p.picture_type, PictureType::CoverFront))
-                .map(FrontCover::from)
-        });
-
         let raw_buffer_size = (block_size_per_ch * spec.channels) as usize;
 
         // reset reader to data position
@@ -430,7 +403,7 @@ impl<R: Read + Seek> DsdReader<R> {
 
         Ok(Self {
             spec,
-            cover,
+            metadata,
             dsd_chunk_size,
             fmt_chunk_size,
             data_chunk_size,
@@ -502,8 +475,12 @@ impl<R: Read + Seek> Decoder for DsdReader<R> {
         Some(self.spec)
     }
 
-    fn cover(&self) -> Option<&FrontCover> {
-        self.cover.as_ref()
+    fn cover(&self) -> Option<FrontCover> {
+        self.metadata
+            .as_ref()?
+            .pictures()
+            .find(|p| matches!(p.picture_type, PictureType::CoverFront))
+            .map(FrontCover::from)
     }
 }
 
@@ -597,7 +574,7 @@ mod tests {
 
         assert_eq!(dsd.block_size_per_ch, 4);
 
-        // 4. 測試 Decode 邏輯
+        // test Decode logic
         let mut output_buf = VecDeque::new();
 
         let result = dsd.decode(&mut output_buf);
