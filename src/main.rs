@@ -67,8 +67,8 @@ fn player_event_loop(
     output.init(player.spec.unwrap())?;
 
     let vc = VolumeController::new(&device);
-    let mut volumn = vc.get_volume().unwrap_or(0);
-    tx.send(AppCommand::VolumeUpdate(volumn as u8)).ok();
+    let mut volume = vc.get_volume().unwrap_or(0);
+    tx.send(AppCommand::VolumeUpdate(volume as u8)).ok();
 
     loop {
         if let Ok(cmd) = rx.try_recv() {
@@ -88,10 +88,10 @@ fn player_event_loop(
                     .ok();
                 }
                 PlayerCommand::SetRelatedVolume(vol) => {
-                    let v = (volumn + vol as i64).clamp(0, 100);
+                    let v = (volume + vol as i64).clamp(0, 100);
                     if vc.set_volume(v).is_ok() {
                         tx.send(AppCommand::VolumeUpdate(v as u8)).ok();
-                        volumn = v;
+                        volume = v;
                     }
                 }
             }
