@@ -21,9 +21,8 @@ use symphonia::core::{
     meta::{MetadataOptions, Visual},
     probe::Hint,
 };
-use walkdir::WalkDir;
 
-use crate::media::MediaSpec;
+use crate::{media::MediaSpec, util::get_cover_with_root_path};
 
 pub struct FrontCover {
     mime: String,
@@ -92,7 +91,7 @@ impl MixDecoder {
         file.seek(std::io::SeekFrom::Start(0))?;
 
         let decoder: Box<dyn Decoder> = if is_dsd_file {
-            Box::new(DsdReader::new(file)?)
+            Box::new(DsdDecoder::new(file)?)
         } else {
             Box::new(PcmDecoder::new(
                 file,
@@ -111,30 +110,8 @@ impl MixDecoder {
     }
 
     fn get_cover(&self) -> Option<FrontCover> {
-        let root = self.file_path.as_ref()?.parent()?;
-        let entry = WalkDir::new(root)
-            .into_iter()
-            .flatten()
-            .find(|entry| {
-                let filename = entry.file_name();
-                filename != "cover.jpg" || filename != "cover.png"
-            })
-            .map(|entry| entry.path().to_owned())?;
-
-        let mime = if entry.extension()?.to_str()? == "jpg" {
-            "image/jpg"
-        } else {
-            "image/png"
-        };
-
-        let mut data = Vec::new();
-        let mut file = std::fs::File::open(entry).ok()?;
-        file.read_to_end(&mut data).ok()?;
-
-        Some(FrontCover {
-            mime: mime.to_owned(),
-            data,
-        })
+        let (mime, data) = get_cover_with_root_path(self.file_path.as_ref()?)?;
+        Some(FrontCover { mime, data })
     }
 }
 
@@ -297,7 +274,7 @@ impl Decoder for PcmDecoder {
     }
 }
 
-pub struct DsdReader<R> {
+pub struct DsdDecoder<R> {
     spec: MediaSpec,
     metadata: Option<Tag>,
     dsd_chunk_size: u64,
@@ -310,7 +287,7 @@ pub struct DsdReader<R> {
     bit_per_sample: u32,
 }
 
-impl<R: Read + Seek> DsdReader<R> {
+impl<R: Read + Seek> DsdDecoder<R> {
     pub fn new(mut reader: R) -> Result<Self> {
         let mut u32_buf = [0u8; 4];
         let mut dsd_chunk_size_buf = [0u8; 8];
@@ -423,7 +400,7 @@ impl<R: Read + Seek> DsdReader<R> {
     }
 }
 
-impl<R: Read + Seek> Decoder for DsdReader<R> {
+impl<R: Read + Seek> Decoder for DsdDecoder<R> {
     fn decode(&mut self, buf: &mut VecDeque<i32>) -> Result<(), DecoderError> {
         if self.read >= self.data_chunk_size as usize {
             return Err(DecoderError::EOF);
@@ -570,7 +547,7 @@ mod tests {
 
         let reader = Cursor::new(mock_file_bytes);
 
-        let mut dsd = DsdReader::new(reader).expect("Header parsing failed");
+        let mut dsd = DsdDecoder::new(reader).expect("Header parsing failed");
 
         assert_eq!(dsd.block_size_per_ch, 4);
 

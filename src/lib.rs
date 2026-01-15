@@ -7,3 +7,4 @@ pub mod player;
 pub mod shared;
 pub mod tui;
 pub mod volume;
+pub mod util;

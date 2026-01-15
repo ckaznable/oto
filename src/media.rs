@@ -1,4 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use lofty::{file::TaggedFileExt, probe::Probe};
+
+use crate::util::get_cover_with_root_path;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -24,11 +28,11 @@ pub struct MediaSpec {
 
 #[derive(Clone, Default, Debug)]
 pub struct TrackMeta {
-   pub path: PathBuf,
-   pub title: Option<String>,
-   pub artist: Option<String>,
-   pub album: Album,
-   pub duration_secs: u64,
+    pub path: PathBuf,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Album,
+    pub duration_secs: u64,
 }
 
 impl TrackMeta {
@@ -37,5 +41,18 @@ impl TrackMeta {
             path,
             ..Default::default()
         }
+    }
+
+    // todo dsd handle
+    pub fn cover(&self, path: &Path) -> Option<Vec<u8>> {
+        let tagged_file = Probe::open(path).ok()?.read().ok()?;
+        let tag = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag())?;
+
+        tag.pictures()
+            .first()
+            .map(|pic| pic.data().to_vec())
+            .or_else(|| Some(get_cover_with_root_path(path)?.1))
     }
 }
