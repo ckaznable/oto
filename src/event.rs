@@ -4,6 +4,8 @@ use crate::tui::AppMode;
 pub enum PlayerCommand {
     PauseCycle,
     SetRelatedVolume(i8),
+    NextSong,
+    PrevSong,
 }
 
 #[derive(Clone)]

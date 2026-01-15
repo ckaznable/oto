@@ -94,6 +94,18 @@ fn player_event_loop(
                         volume = v;
                     }
                 }
+                PlayerCommand::NextSong => {
+                    if player.next().is_ok() {
+                        output.drop().ok();
+                        output.prepare().ok();
+                    }
+                }
+                PlayerCommand::PrevSong => {
+                    if player.prev().is_ok() {
+                        output.drop().ok();
+                        output.prepare().ok();
+                    }
+                }
             }
         }
 

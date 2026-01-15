@@ -121,6 +121,12 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>,) {
                 KeyEvent { code: KeyCode::Char('k'), .. } => {
                     player_tx.send(PlayerCommand::SetRelatedVolume(5)).ok();
                 }
+                KeyEvent { code: KeyCode::Char('l'), .. } => {
+                    player_tx.send(PlayerCommand::NextSong).ok();
+                }
+                KeyEvent { code: KeyCode::Char('h'), .. } => {
+                    player_tx.send(PlayerCommand::PrevSong).ok();
+                }
                 _ => {}
             },
             Err(_) => {
