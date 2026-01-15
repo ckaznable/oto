@@ -176,6 +176,11 @@ impl BufferPlayer {
         self.open(p)
     }
 
+    pub fn clear_buffer(&mut self) {
+        self.rb.clear();
+        self.buf.clear();
+    }
+
     pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {
         self.decoder.open(p.into())?;
         self.spec = self.decoder.spec();

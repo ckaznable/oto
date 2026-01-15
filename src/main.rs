@@ -96,12 +96,14 @@ fn player_event_loop(
                 }
                 PlayerCommand::NextSong => {
                     if player.next().is_ok() {
+                        player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
                     }
                 }
                 PlayerCommand::PrevSong => {
                     if player.prev().is_ok() {
+                        player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
                     }
