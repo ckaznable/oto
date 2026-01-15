@@ -5,3 +5,4 @@ pub mod media;
 pub mod player;
 pub mod shared;
 pub mod tui;
+pub mod volumn;

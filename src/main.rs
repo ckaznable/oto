@@ -11,7 +11,7 @@ use clap::Parser;
 use oto::{
     cli,
     event::{AppCommand, PlayerCommand},
-    player::{AudioOutput, BufferPlayer, PlayerError},
+    player::{AudioOutput, BufferPlayer, PlayerError}, volumn::VolumeController,
 };
 
 fn main() -> Result<()> {
@@ -66,6 +66,10 @@ fn player_event_loop(
     let mut output = AudioOutput::new(&device)?;
     output.init(player.spec.unwrap())?;
 
+    let vc = VolumeController::new(&device);
+    let mut volumn = vc.get_volume().unwrap_or(0);
+    tx.send(AppCommand::VolumnUpdate(volumn as u8)).ok();
+
     loop {
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
@@ -82,6 +86,13 @@ fn player_event_loop(
                         false => oto::tui::AppMode::Playing,
                     }))
                     .ok();
+                }
+                PlayerCommand::SetRelatedVolumn(vol) => {
+                    let v = (volumn + vol as i64).clamp(0, 100);
+                    if vc.set_volume(v).is_ok() {
+                        tx.send(AppCommand::VolumnUpdate(v as u8)).ok();
+                        volumn = v;
+                    }
                 }
             }
         }

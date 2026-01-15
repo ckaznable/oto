@@ -85,6 +85,9 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::AppModeUpdate(mode) => {
                     state.app_mode.set(mode);
                 }
+                AppCommand::VolumnUpdate(vol) => {
+                    state.volumn.set(vol);
+                }
             },
         }
     }
@@ -111,6 +114,12 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>,) {
                 }
                 KeyEvent { code: KeyCode::Char(' '), .. } => {
                     player_tx.send(PlayerCommand::PauseCycle).ok();
+                }
+                KeyEvent { code: KeyCode::Char('j'), .. } => {
+                    player_tx.send(PlayerCommand::SetRelatedVolumn(-5)).ok();
+                }
+                KeyEvent { code: KeyCode::Char('k'), .. } => {
+                    player_tx.send(PlayerCommand::SetRelatedVolumn(5)).ok();
                 }
                 _ => {}
             },
