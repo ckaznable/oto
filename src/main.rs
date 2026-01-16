@@ -74,7 +74,15 @@ fn player_event_loop(
 
     let vc = VolumeController::new(&device);
     let mut volume = vc.get_volume().unwrap_or(0);
+
     tx.send(AppCommand::VolumeUpdate(volume as u8)).ok();
+
+    let mut current_time = 0.;
+    if let Some(track) = player.current() {
+        tx.send(AppCommand::TrackUpdate(track.clone())).ok();
+        mtx.send(MprisCommand::TrackUpdate(track)).ok();
+        mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true)).ok();
+    }
 
     loop {
         if let Ok(cmd) = rx.try_recv() {
@@ -85,6 +93,7 @@ fn player_event_loop(
                     }
 
                     output.pause(false)?;
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true)).ok();
                     tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Playing))
                         .ok();
                 }
@@ -94,6 +103,7 @@ fn player_event_loop(
                     }
 
                     output.pause(true)?;
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false)).ok();
                     tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Paused))
                         .ok();
                 }
@@ -105,6 +115,7 @@ fn player_event_loop(
                     let pause = !matches!(output.state(), State::Paused);
                     output.pause(pause)?;
 
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, !pause)).ok();
                     tx.send(AppCommand::AppModeUpdate(match pause {
                         true => oto::tui::AppMode::Paused,
                         false => oto::tui::AppMode::Playing,
@@ -152,11 +163,12 @@ fn player_event_loop(
             output.prepare()?;
         }
 
+        current_time = player.calc_duration(match output.delay() {
+            Ok(d) => d as u64,
+            Err(_) => 0,
+        });
         tx.send(AppCommand::TimeUpdate(
-            player.calc_duration(match output.delay() {
-                Ok(d) => d as u64,
-                Err(_) => 0,
-            }),
+            current_time,
             player.spec.and_then(|s| s.duration),
         ))
         .ok();

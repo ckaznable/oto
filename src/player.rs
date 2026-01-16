@@ -175,11 +175,11 @@ impl BufferPlayer {
     }
 
     pub fn init(&mut self) -> Result<()> {
-        let p = self
+        let track = self
             .playlist
             .current()
             .ok_or(anyhow!("music file not found"))?;
-        self.open(p)
+        self.open(track.path.clone())
     }
 
     pub fn clear_buffer(&mut self) {
@@ -211,6 +211,10 @@ impl BufferPlayer {
         }
 
         Ok(None)
+    }
+
+    pub fn current(&mut self) -> Option<TrackMeta> {
+        self.playlist.current().cloned()
     }
 
     pub fn set_spec(&mut self, media_spec: MediaSpec, output: &mut AudioOutput) -> Result<()> {
@@ -357,8 +361,8 @@ impl PlayList {
     }
 
     #[inline]
-    pub fn current(&self) -> Option<PathBuf> {
-        self.list.get(self.index).map(|m| m.path.to_owned())
+    pub fn current<'a>(&'a self) -> Option<&TrackMeta> {
+        self.list.get(self.index)
     }
 
     #[inline]

@@ -24,4 +24,5 @@ pub enum AppCommand {
 #[derive(Clone)]
 pub enum MprisCommand {
     TrackUpdate(TrackMeta),
+    PlayBackStateUpdate(f64, bool),
 }

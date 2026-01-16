@@ -4,7 +4,9 @@ use std::{
 };
 
 use anyhow::Result;
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, PlatformConfig};
+use souvlaki::{
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
+};
 
 use crate::event::{MprisCommand, PlayerCommand};
 
@@ -45,6 +47,16 @@ impl Mpris {
                                     album: track.album.name.as_deref(),
                                     duration: Some(Duration::from_secs(track.duration_secs)),
                                     ..Default::default()
+                                })
+                                .ok();
+                        }
+                        MprisCommand::PlayBackStateUpdate(c, p) => {
+                            let progress = Some(MediaPosition(Duration::from_secs_f64(c)));
+                            controls
+                                .set_playback(if p {
+                                    MediaPlayback::Playing { progress }
+                                } else {
+                                    MediaPlayback::Paused { progress }
                                 })
                                 .ok();
                         }
