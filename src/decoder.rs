@@ -7,9 +7,7 @@ use std::{
 use anyhow::{Result, anyhow};
 
 use bytemuck::cast_slice;
-use id3::{
-    Tag,
-};
+use id3::Tag;
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, SampleBuffer},
     codecs::{CODEC_TYPE_NULL, DecoderOptions},
@@ -235,7 +233,7 @@ pub struct DsfMetadata {
     pub bps: u32,
     pub sample_count: u64,
     pub channel_block_size: u32,
-    pub tag: Option<Tag>
+    pub tag: Option<Tag>,
 }
 
 pub struct DsfReader<'a, R> {
@@ -303,7 +301,8 @@ impl<'a, R: Read + Seek> DsfReader<'a, R> {
         }
 
         let metadata_size = file_size - dsd_size;
-        self.reader.seek(SeekFrom::Start(pointer_to_metadata_chunk))?;
+        self.reader
+            .seek(SeekFrom::Start(pointer_to_metadata_chunk))?;
 
         let mut metadata = vec![0u8; metadata_size as usize];
         self.reader.read_exact(&mut metadata)?;
@@ -365,7 +364,9 @@ impl<R: Read + Seek> DsdDecoder<R> {
         let raw_buffer_size = (metadata.channel_block_size * spec.channels) as usize;
 
         // reset reader to data position
-        reader.seek(SeekFrom::Start(metadata.dsd_chunk_size + metadata.fmt_chunk_size + 12))?;
+        reader.seek(SeekFrom::Start(
+            metadata.dsd_chunk_size + metadata.fmt_chunk_size + 12,
+        ))?;
 
         Ok(Self {
             spec,
@@ -534,17 +535,29 @@ mod tests {
         assert!(result.is_ok());
 
         // Block 1 Left (0x04030201)
-        assert_eq!(output_buf.pop_front(), Some(0x04030201));
+        assert_eq!(
+            output_buf.pop_front(),
+            Some((0x04030201u32 as i32).reverse_bits())
+        );
         // Block 1 Right (0x0D0C0B0A)
-        assert_eq!(output_buf.pop_front(), Some(0x0D0C0B0A));
+        assert_eq!(
+            output_buf.pop_front(),
+            Some((0x0D0C0B0Au32 as i32).reverse_bits())
+        );
 
         let result = dsd.decode(&mut output_buf);
         assert!(result.is_ok());
 
         // Block 2 Left (0x55555555)
-        assert_eq!(output_buf.pop_front(), Some(0x55555555));
+        assert_eq!(
+            output_buf.pop_front(),
+            Some((0x55555555u32 as i32).reverse_bits())
+        );
         // Block 2 Right (0x66666666)
-        assert_eq!(output_buf.pop_front(), Some(0x66666666));
+        assert_eq!(
+            output_buf.pop_front(),
+            Some((0x66666666u32 as i32).reverse_bits())
+        );
 
         assert!(output_buf.is_empty());
     }
