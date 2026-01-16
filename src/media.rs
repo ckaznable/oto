@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use lofty::{file::TaggedFileExt, probe::Probe};
 
-use crate::util::get_cover_with_root_path;
+use crate::{decoder::DsfReader, util::get_cover_with_root_path};
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -43,9 +43,8 @@ impl TrackMeta {
         }
     }
 
-    // todo dsd handle
-    pub fn cover(&self, path: &Path) -> Option<Vec<u8>> {
-        let tagged_file = Probe::open(path).ok()?.read().ok()?;
+    pub fn cover(&self) -> Option<Vec<u8>> {
+        let tagged_file = Probe::open(&self.path).ok()?.read().ok()?;
         let tag = tagged_file
             .primary_tag()
             .or_else(|| tagged_file.first_tag())?;
@@ -53,6 +52,14 @@ impl TrackMeta {
         tag.pictures()
             .first()
             .map(|pic| pic.data().to_vec())
-            .or_else(|| Some(get_cover_with_root_path(path)?.1))
+            .or_else(|| {
+                let mut file = std::fs::File::open(&self.path).ok()?;
+                let reader = DsfReader::new(&mut file);
+                if let Ok(metadata) = reader.parse() {
+                    metadata.tag?.pictures().next().map(|p| p.data.clone())
+                } else {
+                    Some(get_cover_with_root_path(&self.path)?.1)
+                }
+            })
     }
 }

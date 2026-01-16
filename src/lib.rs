@@ -8,3 +8,4 @@ pub mod shared;
 pub mod tui;
 pub mod util;
 pub mod volume;
+pub mod mpris;

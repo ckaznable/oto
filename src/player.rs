@@ -195,21 +195,22 @@ impl BufferPlayer {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Result<()> {
-        if let Some(p) = self.playlist.next() {
-            self.open(p)?;
-            return Ok(());
+    pub fn next(&mut self) -> Result<Option<TrackMeta>> {
+        if let Some(track) = self.playlist.next() {
+            self.open(&track.path)?;
+            return Ok(Some(track));
         }
 
         Err(anyhow!("playlist is run dry"))
     }
 
-    pub fn prev(&mut self) -> Result<()> {
-        if let Some(p) = self.playlist.prev() {
-            self.open(p)?;
+    pub fn prev(&mut self) -> Result<Option<TrackMeta>> {
+        if let Some(track) = self.playlist.prev() {
+            self.open(&track.path)?;
+            return Ok(Some(track));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     pub fn set_spec(&mut self, media_spec: MediaSpec, output: &mut AudioOutput) -> Result<()> {
@@ -340,19 +341,19 @@ impl PlayList {
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<PathBuf> {
+    pub fn next(&mut self) -> Option<TrackMeta> {
         let next = self.index + 1;
         if next >= self.list.len() {
             return None;
         }
 
         self.index = next;
-        self.list.get(next).map(|p| p.path.clone())
+        self.list.get(next).cloned()
     }
 
-    pub fn prev(&mut self) -> Option<PathBuf> {
+    pub fn prev(&mut self) -> Option<TrackMeta> {
         self.index = self.index.saturating_sub(1);
-        self.list.get(self.index).map(|m| m.path.to_owned())
+        self.list.get(self.index).cloned()
     }
 
     #[inline]

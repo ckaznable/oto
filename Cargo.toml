@@ -23,6 +23,8 @@ walkdir = "2.5.0"
 strum = { version = "0.27", features = ["derive"] }
 lofty = "0.22.4"
 rayon = "1.11.0"
+souvlaki = { version = "0.8.3", default-features = false, features = ["use_zbus"] }
+tempfile = "3.24.0"
 
 [profile.release]
 opt-level = "z"

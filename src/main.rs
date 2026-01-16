@@ -10,7 +10,8 @@ use anyhow::Result;
 use clap::Parser;
 use oto::{
     cli,
-    event::{AppCommand, PlayerCommand},
+    event::{AppCommand, MprisCommand, PlayerCommand},
+    mpris,
     player::{AudioOutput, BufferPlayer, PlayerError},
     volume::VolumeController,
 };
@@ -19,12 +20,15 @@ fn main() -> Result<()> {
     let args = cli::Args::parse();
 
     let (player_tx, player_rx) = channel();
+    let (mpris_tx, mpris_rx) = channel();
     let (app_tx, app_rx) = channel();
+
+    let _mpris = mpris::Mpris::handle(player_tx.clone(), mpris_rx)?;
 
     match args.command {
         cli::Commands::Play { path, device } => {
             spawn_mock_app_event_handler(app_rx);
-            player_event_loop(path, device, app_tx, player_rx)
+            player_event_loop(path, device, app_tx, mpris_tx, player_rx)
         }
         cli::Commands::Tui { path, device } => {
             WriteLogger::init(
@@ -36,7 +40,7 @@ fn main() -> Result<()> {
 
             use enclose::enclose;
             std::thread::spawn(enclose!((app_tx) move || {
-                if let Err(e) = player_event_loop(path, device, app_tx.clone(), player_rx) {
+                if let Err(e) = player_event_loop(path, device, app_tx.clone(), mpris_tx, player_rx) {
                     app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
                     log::error!("{e:?}");
                 }
@@ -59,6 +63,7 @@ fn player_event_loop(
     path: impl Into<PathBuf>,
     device: String,
     tx: Sender<AppCommand>,
+    mtx: Sender<MprisCommand>,
     rx: Receiver<PlayerCommand>,
 ) -> Result<()> {
     let mut player = BufferPlayer::new(path)?;
@@ -74,6 +79,24 @@ fn player_event_loop(
     loop {
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
+                PlayerCommand::Play => {
+                    if matches!(output.state(), State::Suspended) {
+                        output.resume()?;
+                    }
+
+                    output.pause(false)?;
+                    tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Playing))
+                        .ok();
+                }
+                PlayerCommand::Pause => {
+                    if matches!(output.state(), State::Suspended) {
+                        output.resume()?;
+                    }
+
+                    output.pause(true)?;
+                    tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Paused))
+                        .ok();
+                }
                 PlayerCommand::PauseCycle => {
                     if matches!(output.state(), State::Suspended) {
                         output.resume()?;
@@ -96,17 +119,21 @@ fn player_event_loop(
                     }
                 }
                 PlayerCommand::NextSong => {
-                    if player.next().is_ok() {
+                    if let Ok(Some(track)) = player.next() {
                         player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
+                        tx.send(AppCommand::TrackUpdate(track.clone())).ok();
+                        mtx.send(MprisCommand::TrackUpdate(track)).ok();
                     }
                 }
                 PlayerCommand::PrevSong => {
-                    if player.prev().is_ok() {
+                    if let Ok(Some(track)) = player.prev() {
                         player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
+                        tx.send(AppCommand::TrackUpdate(track.clone())).ok();
+                        mtx.send(MprisCommand::TrackUpdate(track)).ok();
                     }
                 }
             }

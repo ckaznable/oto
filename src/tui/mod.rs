@@ -95,6 +95,9 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::VolumeUpdate(vol) => {
                     state.volume.set(vol);
                 }
+                AppCommand::TrackUpdate(track) => {
+
+                }
             },
         }
     }
