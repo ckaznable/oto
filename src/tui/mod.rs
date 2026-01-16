@@ -1,17 +1,24 @@
 use enclose::enclose;
-use strum::Display;
 use std::{
     cell::Cell,
     rc::Rc,
     sync::mpsc::{Receiver, Sender},
 };
+use strum::Display;
 
 use ratatui::{
-    DefaultTerminal, Frame, crossterm::{self, event::{Event, KeyCode, KeyEvent}},
+    DefaultTerminal, Frame,
+    crossterm::{
+        self,
+        event::{Event, KeyCode, KeyEvent},
+    },
     layout::{Constraint, Layout},
 };
 
-use crate::{event::{AppCommand, PlayerCommand}, tui::state_bar::StateBar};
+use crate::{
+    event::{AppCommand, PlayerCommand},
+    tui::state_bar::StateBar,
+};
 
 pub mod state_bar;
 
@@ -105,26 +112,44 @@ fn render(frame: &mut Frame, mut state: AppState) {
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 
-fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>,) {
+fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
     loop {
         match crossterm::event::read() {
             Ok(Event::Key(event)) => match event {
-                KeyEvent { code: KeyCode::Char('q'), .. } => {
+                KeyEvent {
+                    code: KeyCode::Char('q'),
+                    ..
+                } => {
                     tx.send(AppCommand::End).ok();
                 }
-                KeyEvent { code: KeyCode::Char(' '), .. } => {
+                KeyEvent {
+                    code: KeyCode::Char(' '),
+                    ..
+                } => {
                     player_tx.send(PlayerCommand::PauseCycle).ok();
                 }
-                KeyEvent { code: KeyCode::Char('j'), .. } => {
+                KeyEvent {
+                    code: KeyCode::Char('j'),
+                    ..
+                } => {
                     player_tx.send(PlayerCommand::SetRelatedVolume(-5)).ok();
                 }
-                KeyEvent { code: KeyCode::Char('k'), .. } => {
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    ..
+                } => {
                     player_tx.send(PlayerCommand::SetRelatedVolume(5)).ok();
                 }
-                KeyEvent { code: KeyCode::Char('l'), .. } => {
+                KeyEvent {
+                    code: KeyCode::Char('l'),
+                    ..
+                } => {
                     player_tx.send(PlayerCommand::NextSong).ok();
                 }
-                KeyEvent { code: KeyCode::Char('h'), .. } => {
+                KeyEvent {
+                    code: KeyCode::Char('h'),
+                    ..
+                } => {
                     player_tx.send(PlayerCommand::PrevSong).ok();
                 }
                 _ => {}

@@ -25,7 +25,7 @@ pub enum Commands {
 
         #[arg(short, long)]
         device: String,
-    }
+    },
 }
 
 #[derive(Subcommand, Debug)]

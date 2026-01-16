@@ -11,7 +11,8 @@ use clap::Parser;
 use oto::{
     cli,
     event::{AppCommand, PlayerCommand},
-    player::{AudioOutput, BufferPlayer, PlayerError}, volume::VolumeController,
+    player::{AudioOutput, BufferPlayer, PlayerError},
+    volume::VolumeController,
 };
 
 fn main() -> Result<()> {
@@ -117,7 +118,10 @@ fn player_event_loop(
         }
 
         output.wait(Some(32))?;
-        if !matches!(output.state(), State::Running | State::Prepared | State::Paused) {
+        if !matches!(
+            output.state(),
+            State::Running | State::Prepared | State::Paused
+        ) {
             output.prepare()?;
         }
 

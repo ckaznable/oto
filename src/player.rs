@@ -11,7 +11,11 @@ use alsa::{
     pcm::{HwParams, State},
 };
 use bytemuck::cast_slice;
-use lofty::{file::{AudioFile, TaggedFileExt}, probe::Probe, tag::Accessor};
+use lofty::{
+    file::{AudioFile, TaggedFileExt},
+    probe::Probe,
+    tag::Accessor,
+};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ringbuf::{
     LocalRb,

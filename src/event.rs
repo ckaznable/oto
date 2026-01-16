@@ -17,4 +17,3 @@ pub enum AppCommand {
     AppModeUpdate(AppMode),
     VolumeUpdate(u8),
 }
-

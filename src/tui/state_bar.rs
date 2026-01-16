@@ -26,7 +26,11 @@ impl StatefulWidget for StateBar {
         let app_mode_len = app_mode_str.len() + 3;
 
         let playing = state.playing.get();
-        let current_time = format!(" {:02}:{:02.0} ", (playing.current / 60.).floor(), (playing.current % 60.).floor());
+        let current_time = format!(
+            " {:02}:{:02.0} ",
+            (playing.current / 60.).floor(),
+            (playing.current % 60.).floor()
+        );
         let timer_len = current_time.len() + 1;
 
         let layout = Layout::horizontal([
@@ -45,7 +49,10 @@ impl StatefulWidget for StateBar {
         let timer_color = Color::Magenta;
 
         let line = Line::from(vec![
-            Span::styled(format!(" {app_mode_str} "), Style::new().fg(mode_color.0).bg(mode_color.1)),
+            Span::styled(
+                format!(" {app_mode_str} "),
+                Style::new().fg(mode_color.0).bg(mode_color.1),
+            ),
             Span::styled("", Style::new().fg(mode_color.1).bg(timer_color)),
         ]);
         line.render(left, buf);
@@ -60,12 +67,15 @@ impl StatefulWidget for StateBar {
             Span::styled(current_time, Style::new().bg(timer_color).fg(Color::Black)),
             Span::styled("", Style::new().fg(timer_color).bg(arrow_bg)),
         ]);
-        line.render(Rect {
-            x: left.x + app_mode_len as u16,
-            y: left.y,
-            width: timer_len as u16,
-            height: 1,
-        }, buf);
+        line.render(
+            Rect {
+                x: left.x + app_mode_len as u16,
+                y: left.y,
+                width: timer_len as u16,
+                height: 1,
+            },
+            buf,
+        );
 
         let layout = Layout::horizontal([
             Constraint::Length(3),

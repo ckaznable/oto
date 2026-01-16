@@ -6,5 +6,5 @@ pub mod media;
 pub mod player;
 pub mod shared;
 pub mod tui;
-pub mod volume;
 pub mod util;
+pub mod volume;
