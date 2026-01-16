@@ -9,56 +9,18 @@ use anyhow::{Result, anyhow};
 use bytemuck::cast_slice;
 use id3::{
     Tag,
-    frame::{Picture, PictureType},
 };
-use image::{DynamicImage, ImageFormat};
 use symphonia::core::{
     audio::{AudioBuffer, AudioBufferRef, SampleBuffer},
     codecs::{CODEC_TYPE_NULL, DecoderOptions},
     errors::Error,
     formats::{FormatOptions, FormatReader},
     io::{MediaSource, MediaSourceStream},
-    meta::{MetadataOptions, Visual},
+    meta::MetadataOptions,
     probe::Hint,
 };
 
-use crate::{media::MediaSpec, util::get_cover_with_root_path};
-
-pub struct FrontCover {
-    mime: String,
-    data: Vec<u8>,
-}
-
-impl FrontCover {
-    pub fn decode(&self) -> anyhow::Result<DynamicImage> {
-        let img = image::ImageReader::with_format(
-            Cursor::new(&self.data),
-            ImageFormat::from_mime_type(&self.mime)
-                .ok_or_else(|| anyhow::anyhow!("image decode error, wrong mime type"))?,
-        )
-        .decode()?;
-
-        Ok(img)
-    }
-}
-
-impl From<&Visual> for FrontCover {
-    fn from(value: &Visual) -> Self {
-        Self {
-            mime: value.media_type.clone(),
-            data: value.data.to_vec(),
-        }
-    }
-}
-
-impl From<&Picture> for FrontCover {
-    fn from(value: &Picture) -> Self {
-        Self {
-            mime: value.mime_type.clone(),
-            data: value.data.clone(),
-        }
-    }
-}
+use crate::media::MediaSpec;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, thiserror::Error)]
@@ -74,7 +36,6 @@ pub enum DecoderError {
 pub trait Decoder {
     fn decode(&mut self, buf: &mut VecDeque<i32>) -> Result<(), DecoderError>;
     fn spec(&self) -> Option<MediaSpec>;
-    fn cover(&self) -> Option<FrontCover>;
 }
 
 #[derive(Default)]
@@ -88,7 +49,7 @@ impl MixDecoder {
         self.file_path = Some(p.clone());
         let mut file = std::fs::File::open(&p)?;
         let is_dsd_file = Self::is_dsd_file(&mut file)?;
-        file.seek(std::io::SeekFrom::Start(0))?;
+        file.seek(SeekFrom::Start(0))?;
 
         let decoder: Box<dyn Decoder> = if is_dsd_file {
             Box::new(DsdDecoder::new(file)?)
@@ -108,11 +69,6 @@ impl MixDecoder {
         r.read_exact(&mut buf)?;
         Ok(&buf == b"DSD ")
     }
-
-    fn get_cover(&self) -> Option<FrontCover> {
-        let (mime, data) = get_cover_with_root_path(self.file_path.as_ref()?)?;
-        Some(FrontCover { mime, data })
-    }
 }
 
 impl Decoder for MixDecoder {
@@ -127,11 +83,6 @@ impl Decoder for MixDecoder {
         }
 
         Ok(())
-    }
-
-    fn cover(&self) -> Option<FrontCover> {
-        self.get_cover()
-            .or_else(|| self.decoder.as_ref().and_then(|d| d.cover()))
     }
 }
 
@@ -268,124 +219,157 @@ impl Decoder for PcmDecoder {
             }
         }
     }
+}
 
-    fn cover(&self) -> Option<FrontCover> {
-        None
+pub struct DsfMetadata {
+    pub dsd_chunk_size: u64,
+    pub fmt_chunk_size: u64,
+    pub data_chunk_size: u64,
+    pub file_size: u64,
+    pub pointer_to_metadata_chunk: u64,
+    pub format_version: u32,
+    pub format_id: u32,
+    pub channel_type: u32,
+    pub channel_num: u32,
+    pub sample_freq: u32,
+    pub bps: u32,
+    pub sample_count: u64,
+    pub channel_block_size: u32,
+    pub tag: Option<Tag>
+}
+
+pub struct DsfReader<'a, R> {
+    reader: &'a mut R,
+    u32_buf: [u8; 4],
+    u64_buf: [u8; 8],
+}
+
+impl<'a, R: Read + Seek> DsfReader<'a, R> {
+    pub fn new(reader: &'a mut R) -> Self {
+        Self {
+            reader,
+            u32_buf: [0u8; 4],
+            u64_buf: [0u8; 8],
+        }
     }
-}
 
-pub struct DsdDecoder<R> {
-    spec: MediaSpec,
-    metadata: Option<Tag>,
-    dsd_chunk_size: u64,
-    fmt_chunk_size: u64,
-    data_chunk_size: u64,
-    block_size_per_ch: u32,
-    reader: R,
-    read: usize,
-    raw_block_buf: Vec<u8>,
-    bit_per_sample: u32,
-}
-
-impl<R: Read + Seek> DsdDecoder<R> {
-    pub fn new(mut reader: R) -> Result<Self> {
-        let mut u32_buf = [0u8; 4];
-        let mut dsd_chunk_size_buf = [0u8; 8];
-        let mut fmt_chunk_size_buf = [0u8; 8];
-        let mut data_chunk_size_buf = [0u8; 8];
-        let mut file_size_buf = [0u8; 8];
-        let mut metadata_pot_buf = [0u8; 8];
-        let mut channel_num_buf = [0u8; 4];
-        let mut sample_freq_buf = [0u8; 4];
-        let mut block_size_per_ch_buf = [0u8; 4];
-        let mut bit_per_sample_buf = [0u8; 4];
-        let mut total_sample_count_buf = [0u8; 8];
+    pub fn parse(mut self) -> Result<DsfMetadata> {
+        self.reader.seek(SeekFrom::Start(0))?;
 
         // 'DSD '
-        reader.read_exact(&mut u32_buf)?;
-        if &u32_buf != b"DSD " {
+        if &self.read_u32()?.to_le_bytes() != b"DSD " {
             return Err(anyhow!("not dsf file"));
         }
         // size of dsd chunk
-        reader.read_exact(&mut dsd_chunk_size_buf)?;
+        let dsd_chunk_size = self.read_u64()?;
         // totol file size
-        reader.read_exact(&mut file_size_buf)?;
+        let file_size = self.read_u64()?;
         // pointer to metadata chunk
-        reader.read_exact(&mut metadata_pot_buf)?;
+        let pointer_to_metadata_chunk = self.read_u64()?;
         // 'fmt '
-        reader.read_exact(&mut u32_buf)?;
-        if &u32_buf != b"fmt " {
+        if &self.read_u32()?.to_le_bytes() != b"fmt " {
             return Err(anyhow!("not dsf file"));
         }
         // size of fmt chunk
-        reader.read_exact(&mut fmt_chunk_size_buf)?;
+        let fmt_chunk_size = self.read_u64()?;
         // format version
-        reader.read_exact(&mut u32_buf)?;
+        let format_version = self.read_u32()?;
         // format id
-        reader.read_exact(&mut u32_buf)?;
+        let format_id = self.read_u32()?;
         // channel type
-        reader.read_exact(&mut u32_buf)?;
+        let channel_type = self.read_u32()?;
         // channel num
-        reader.read_exact(&mut channel_num_buf)?;
+        let channel_num = self.read_u32()?;
         // sampleling frequency
-        reader.read_exact(&mut sample_freq_buf)?;
+        let sample_freq = self.read_u32()?;
         // bit per sample
-        reader.read_exact(&mut bit_per_sample_buf)?;
+        let bps = self.read_u32()?;
         // sample count
-        reader.read_exact(&mut total_sample_count_buf)?;
+        let sample_count = self.read_u64()?;
         // block size per channel
-        reader.read_exact(&mut block_size_per_ch_buf)?;
+        let channel_block_size = self.read_u32()?;
         // reserved
-        reader.read_exact(&mut u32_buf)?;
+        self.read_u32()?;
         // 'data'
-        reader.read_exact(&mut u32_buf)?;
-        if &u32_buf != b"data" {
+        if &self.read_u32()?.to_le_bytes() != b"data" {
             return Err(anyhow!("not dsf file"));
         }
         // size of data chunk
-        reader.read_exact(&mut data_chunk_size_buf)?;
+        let data_chunk_size = self.read_u64()?;
 
-        let metadata_pot = u64::from_le_bytes(metadata_pot_buf);
-        let dsd_chunk_size = u64::from_le_bytes(dsd_chunk_size_buf);
-        let fmt_chunk_size = u64::from_le_bytes(fmt_chunk_size_buf);
-        let data_chunk_size = u64::from_le_bytes(data_chunk_size_buf);
-        let file_size = u64::from_le_bytes(file_size_buf);
-        let block_size_per_ch = u32::from_le_bytes(block_size_per_ch_buf);
-        let bit_per_sample = u32::from_le_bytes(bit_per_sample_buf);
-        let total_sample_count = u64::from_le_bytes(total_sample_count_buf);
-        let sample_rate = u32::from_le_bytes(sample_freq_buf);
         let dsd_size = dsd_chunk_size + fmt_chunk_size + data_chunk_size;
         if dsd_size > file_size {
             return Err(anyhow!("dsd file parser error"));
         }
 
         let metadata_size = file_size - dsd_size;
-        reader.seek(SeekFrom::Start(metadata_pot))?;
+        self.reader.seek(SeekFrom::Start(pointer_to_metadata_chunk))?;
 
         let mut metadata = vec![0u8; metadata_size as usize];
-        reader.read_exact(&mut metadata)?;
+        self.reader.read_exact(&mut metadata)?;
 
-        let metadata = id3::v1v2::read_from(Cursor::new(metadata)).ok();
+        let tag = id3::v1v2::read_from(Cursor::new(metadata)).ok();
+
+        Ok(DsfMetadata {
+            dsd_chunk_size,
+            fmt_chunk_size,
+            data_chunk_size,
+            file_size,
+            pointer_to_metadata_chunk,
+            format_version,
+            format_id,
+            channel_type,
+            channel_num,
+            sample_freq,
+            bps,
+            sample_count,
+            channel_block_size,
+            tag,
+        })
+    }
+
+    fn read_u32(&mut self) -> Result<u32> {
+        self.reader.read_exact(&mut self.u32_buf)?;
+        Ok(u32::from_le_bytes(self.u32_buf))
+    }
+
+    fn read_u64(&mut self) -> Result<u64> {
+        self.reader.read_exact(&mut self.u64_buf)?;
+        Ok(u64::from_le_bytes(self.u64_buf))
+    }
+}
+
+pub struct DsdDecoder<R> {
+    spec: MediaSpec,
+    metadata: DsfMetadata,
+    reader: R,
+    read: usize,
+    raw_block_buf: Vec<u8>,
+}
+
+impl<R: Read + Seek> DsdDecoder<R> {
+    pub fn new(mut reader: R) -> Result<Self> {
+        let dsf_reader = DsfReader::new(&mut reader);
+        let mut metadata = dsf_reader.parse()?;
+
+        // pop tag data
+        metadata.tag.take();
+
         let spec = MediaSpec {
-            sample_rate,
-            duration: Some(total_sample_count / sample_rate as u64),
-            channels: u32::from_le_bytes(channel_num_buf),
+            sample_rate: metadata.sample_freq,
+            duration: Some(metadata.sample_count / metadata.sample_freq as u64),
+            channels: metadata.channel_num,
             mode: crate::media::OutputMode::DSD,
         };
 
-        let raw_buffer_size = (block_size_per_ch * spec.channels) as usize;
+        let raw_buffer_size = (metadata.channel_block_size * spec.channels) as usize;
 
         // reset reader to data position
-        reader.seek(SeekFrom::Start(dsd_chunk_size + fmt_chunk_size + 12))?;
+        reader.seek(SeekFrom::Start(metadata.dsd_chunk_size + metadata.fmt_chunk_size + 12))?;
 
         Ok(Self {
             spec,
             metadata,
-            dsd_chunk_size,
-            fmt_chunk_size,
-            data_chunk_size,
-            block_size_per_ch,
-            bit_per_sample,
             reader,
             read: 0,
             raw_block_buf: vec![0u8; raw_buffer_size],
@@ -394,7 +378,7 @@ impl<R: Read + Seek> DsdDecoder<R> {
 
     pub fn reset(&mut self) -> anyhow::Result<()> {
         self.reader.seek(SeekFrom::Start(
-            self.dsd_chunk_size + self.fmt_chunk_size + 12,
+            self.metadata.dsd_chunk_size + self.metadata.fmt_chunk_size + 12,
         ))?;
         Ok(())
     }
@@ -402,12 +386,12 @@ impl<R: Read + Seek> DsdDecoder<R> {
 
 impl<R: Read + Seek> Decoder for DsdDecoder<R> {
     fn decode(&mut self, buf: &mut VecDeque<i32>) -> Result<(), DecoderError> {
-        if self.read >= self.data_chunk_size as usize {
+        if self.read >= self.metadata.data_chunk_size as usize {
             return Err(DecoderError::EOF);
         }
 
         // channels block size (bytes)
-        let block_bytes = self.block_size_per_ch as usize;
+        let block_bytes = self.metadata.channel_block_size as usize;
         let channels = self.spec.channels as usize;
         let total_bytes_to_read = block_bytes * channels;
 
@@ -428,7 +412,7 @@ impl<R: Read + Seek> Decoder for DsdDecoder<R> {
         for i in 0..samples_per_block {
             for ch in 0..channels {
                 let src_index = (ch * samples_per_block) + i;
-                let sample = if self.bit_per_sample == 1 {
+                let sample = if self.metadata.bps == 1 {
                     (u32_view[src_index] as i32).to_be()
                 } else {
                     u32_view[src_index] as i32
@@ -439,8 +423,8 @@ impl<R: Read + Seek> Decoder for DsdDecoder<R> {
 
         // remove metadata chunk
         self.read += total_bytes_to_read;
-        if self.read >= self.data_chunk_size as usize {
-            for _ in 0..(self.read - self.data_chunk_size as usize) {
+        if self.read >= self.metadata.data_chunk_size as usize {
+            for _ in 0..(self.read - self.metadata.data_chunk_size as usize) {
                 buf.pop_back();
             }
         }
@@ -450,14 +434,6 @@ impl<R: Read + Seek> Decoder for DsdDecoder<R> {
 
     fn spec(&self) -> Option<MediaSpec> {
         Some(self.spec)
-    }
-
-    fn cover(&self) -> Option<FrontCover> {
-        self.metadata
-            .as_ref()?
-            .pictures()
-            .find(|p| matches!(p.picture_type, PictureType::CoverFront))
-            .map(FrontCover::from)
     }
 }
 
@@ -549,7 +525,7 @@ mod tests {
 
         let mut dsd = DsdDecoder::new(reader).expect("Header parsing failed");
 
-        assert_eq!(dsd.block_size_per_ch, 4);
+        assert_eq!(dsd.metadata.channel_block_size, 4);
 
         // test Decode logic
         let mut output_buf = VecDeque::new();
