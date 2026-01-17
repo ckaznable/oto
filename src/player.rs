@@ -375,7 +375,16 @@ pub fn scan_music_library(root_path: &Path) -> Vec<TrackMeta> {
     let files: Vec<_> = WalkDir::new(root_path)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().is_some_and(|ext| ext == "flac"))
+        .filter(|e| {
+            e.path().extension().is_some_and(|ext| {
+                ext == "flac"
+                    || ext == "dsf"
+                    || ext == "acc"
+                    || ext == "mp3"
+                    || ext == "ogg"
+                    || ext == "wav"
+            })
+        })
         .collect();
 
     let tracks: Vec<TrackMeta> = files
