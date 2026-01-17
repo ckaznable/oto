@@ -2,7 +2,7 @@ use enclose::enclose;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{Receiver, Sender}, time::{Duration, Instant},
 };
 use strum::Display;
 
@@ -83,8 +83,14 @@ pub fn tui(
 fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Result<()> {
     let state = AppState::new();
 
+    let min_refresh_duration = Duration::from_secs_f64(1. / 60.);
+    let mut timer = Instant::now();
+    let mut should_render = true;
+
     loop {
-        terminal.draw(enclose!((state) move |f| render(f, state)))?;
+        if should_render {
+            terminal.draw(enclose!((state) move |f| render(f, state)))?;
+        }
 
         match rx.recv() {
             Err(_) => break Ok(()),
@@ -108,8 +114,12 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::TrackUpdate(track, spec) => {
                     *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 }
-            },
+            }
         }
+
+        let refresh_time = timer.elapsed();
+        should_render = refresh_time > min_refresh_duration;
+        timer = Instant::now();
     }
 }
 
