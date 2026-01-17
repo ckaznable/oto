@@ -1,8 +1,9 @@
+use gag::Redirect;
 use log::LevelFilter;
+use os_pipe::{PipeWriter, pipe};
 use simplelog::WriteLogger;
 use std::{
-    path::PathBuf,
-    sync::mpsc::{Receiver, Sender, channel},
+    io::{BufRead, BufReader}, path::PathBuf, sync::mpsc::{Receiver, Sender, channel}
 };
 
 use alsa::pcm::State;
@@ -38,6 +39,8 @@ fn main() -> Result<()> {
             )
             .unwrap();
 
+            let _guard = redirect_stderr_to_log();
+
             use enclose::enclose;
             std::thread::spawn(enclose!((app_tx) move || {
                 if let Err(e) = player_event_loop(path, device, app_tx.clone(), mpris_tx, player_rx) {
@@ -57,6 +60,29 @@ fn spawn_mock_app_event_handler(rx: Receiver<AppCommand>) {
             let _ = rx.recv();
         }
     });
+}
+
+fn redirect_stderr_to_log() -> Redirect<PipeWriter> {
+    let (reader, writer) = pipe().unwrap();
+
+    let redirect = Redirect::stderr(writer).unwrap();
+
+    std::thread::spawn(move || {
+        let mut buf_reader = BufReader::new(reader);
+        let mut line = String::new();
+
+        while let Ok(len) = buf_reader.read_line(&mut line) {
+            if len == 0 { break; }
+
+            let clean_line = line.trim();
+            if !clean_line.is_empty() {
+                log::error!(target: "stderr", "{}", clean_line);
+            }
+            line.clear();
+        }
+    });
+
+    redirect
 }
 
 fn player_event_loop(
@@ -82,7 +108,8 @@ fn player_event_loop(
     if let Some(track) = player.current() {
         tx.send(AppCommand::TrackUpdate(track.clone())).ok();
         mtx.send(MprisCommand::TrackUpdate(track)).ok();
-        mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true)).ok();
+        mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
+            .ok();
     }
 
     loop {
@@ -94,7 +121,8 @@ fn player_event_loop(
                     }
 
                     output.pause(false)?;
-                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true)).ok();
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
+                        .ok();
                     tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Playing))
                         .ok();
                 }
@@ -104,7 +132,8 @@ fn player_event_loop(
                     }
 
                     output.pause(true)?;
-                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false)).ok();
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
+                        .ok();
                     tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Paused))
                         .ok();
                 }
@@ -116,7 +145,8 @@ fn player_event_loop(
                     let pause = !matches!(output.state(), State::Paused);
                     output.pause(pause)?;
 
-                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, !pause)).ok();
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, !pause))
+                        .ok();
                     tx.send(AppCommand::AppModeUpdate(match pause {
                         true => oto::tui::AppMode::Paused,
                         false => oto::tui::AppMode::Playing,

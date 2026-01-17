@@ -1,4 +1,5 @@
 use std::{
+    io::Write,
     sync::mpsc::{Receiver, Sender},
     time::Duration,
 };
@@ -8,10 +9,15 @@ use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
 
-use crate::event::{MprisCommand, PlayerCommand};
+use crate::{
+    event::{MprisCommand, PlayerCommand},
+    shared::PROJ_DIRS,
+};
 
 const MPRIS_DBUS_NAME: &str = "io.github.ckaznable.oto";
 const MPRIS_DISPLAY_NAME: &str = "OTO";
+
+const COVER_CACHE_FILE_NAME: &str = "cover";
 
 pub struct Mpris {}
 
@@ -43,13 +49,23 @@ impl Mpris {
                 if let Ok(event) = rx.recv() {
                     match event {
                         MprisCommand::TrackUpdate(track) => {
+                            let cover_url = track.cover().and_then(|data| {
+                                let cover_file_path =
+                                    PROJ_DIRS.cache_dir().join(COVER_CACHE_FILE_NAME);
+                                let mut f = std::fs::File::open(&cover_file_path).ok()?;
+                                f.write_all(&data).ok();
+                                Some(cover_file_path)
+                            });
+
                             controls
                                 .set_metadata(MediaMetadata {
                                     title: track.title.as_deref(),
                                     artist: track.artist.as_deref(),
                                     album: track.album.name.as_deref(),
                                     duration: Some(Duration::from_secs(track.duration_secs)),
-                                    ..Default::default()
+                                    cover_url: cover_url
+                                        .as_ref()
+                                        .and_then(|p| p.as_os_str().to_str()),
                                 })
                                 .ok();
                         }

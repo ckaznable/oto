@@ -25,6 +25,8 @@ lofty = "0.22.4"
 rayon = "1.11.0"
 souvlaki = { version = "0.8.3", default-features = false, features = ["use_zbus"] }
 tempfile = "3.24.0"
+gag = "1.0.0"
+os_pipe = "1.2.3"
 
 [profile.release]
 opt-level = "z"
