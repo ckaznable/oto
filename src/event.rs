@@ -6,6 +6,7 @@ pub enum PlayerCommand {
     Pause,
     Play,
     SetRelatedVolume(i8),
+    SetVolumn(u8),
     NextSong,
     PrevSong,
 }
@@ -25,4 +26,5 @@ pub enum AppCommand {
 pub enum MprisCommand {
     TrackUpdate(TrackMeta),
     PlayBackStateUpdate(f64, bool),
+    VolumeUpdate(u8),
 }

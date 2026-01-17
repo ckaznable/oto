@@ -76,6 +76,7 @@ fn player_event_loop(
     let mut volume = vc.get_volume().unwrap_or(0);
 
     tx.send(AppCommand::VolumeUpdate(volume as u8)).ok();
+    mtx.send(MprisCommand::VolumeUpdate(volume as u8)).ok();
 
     let mut current_time = 0.;
     if let Some(track) = player.current() {
@@ -127,6 +128,12 @@ fn player_event_loop(
                     if vc.set_volume(v).is_ok() {
                         tx.send(AppCommand::VolumeUpdate(v as u8)).ok();
                         volume = v;
+                    }
+                }
+                PlayerCommand::SetVolumn(vol) => {
+                    if vc.set_volume(vol as i64).is_ok() {
+                        tx.send(AppCommand::VolumeUpdate(vol)).ok();
+                        volume = vol as i64;
                     }
                 }
                 PlayerCommand::NextSong => {
