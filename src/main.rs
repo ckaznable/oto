@@ -134,7 +134,6 @@ fn player_event_loop(
                 PlayerCommand::SetVolumn(vol) => {
                     if vc.set_volume(vol as i64).is_ok() {
                         tx.send(AppCommand::VolumeUpdate(vol)).ok();
-                        mtx.send(MprisCommand::VolumeUpdate(vol)).ok();
                         volume = vol as i64;
                     }
                 }
