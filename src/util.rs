@@ -9,7 +9,7 @@ pub fn get_cover_with_root_path(file_path: &Path) -> Option<(String, Vec<u8>)> {
         .flatten()
         .find(|entry| {
             let filename = entry.file_name();
-            filename != "cover.jpg" || filename != "cover.png"
+            filename == "cover.jpg" || filename == "cover.png"
         })
         .map(|entry| entry.path().to_owned())?;
 

@@ -44,6 +44,8 @@ impl Mpris {
             .ok();
         })?;
 
+        std::fs::create_dir_all(PROJ_DIRS.cache_dir())?;
+
         std::thread::spawn(move || {
             loop {
                 if let Ok(event) = rx.recv() {
@@ -52,7 +54,7 @@ impl Mpris {
                             let cover_url = track.cover().and_then(|data| {
                                 let cover_file_path =
                                     PROJ_DIRS.cache_dir().join(COVER_CACHE_FILE_NAME);
-                                let mut f = std::fs::File::open(&cover_file_path).ok()?;
+                                let mut f = std::fs::File::create(&cover_file_path).ok()?;
                                 f.write_all(&data).ok();
                                 Some(cover_file_path)
                             });
