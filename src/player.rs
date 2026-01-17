@@ -361,7 +361,7 @@ impl PlayList {
     }
 
     #[inline]
-    pub fn current<'a>(&'a self) -> Option<&TrackMeta> {
+    pub fn current(&self) -> Option<&TrackMeta> {
         self.list.get(self.index)
     }
 
