@@ -10,9 +10,17 @@ pub struct VolumeController {
 
 impl VolumeController {
     pub fn new(card: &str) -> Self {
-        Self {
-            mixer_name: card.to_string(),
+        let mut mixer_name = card.to_string();
+        if mixer_name.starts_with("hw")
+            && mixer_name.contains(",")
+            && let Some(name) = mixer_name.split(",").next()
+        {
+            mixer_name = name.to_owned();
         }
+
+        log::debug!("card name to config volume controller: {mixer_name}");
+
+        Self { mixer_name }
     }
 
     pub fn set_device(&mut self, card: &str) {
