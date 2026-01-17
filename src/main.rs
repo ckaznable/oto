@@ -127,12 +127,14 @@ fn player_event_loop(
                     let v = (volume + vol as i64).clamp(0, 100);
                     if vc.set_volume(v).is_ok() {
                         tx.send(AppCommand::VolumeUpdate(v as u8)).ok();
+                        mtx.send(MprisCommand::VolumeUpdate(v as u8)).ok();
                         volume = v;
                     }
                 }
                 PlayerCommand::SetVolumn(vol) => {
                     if vc.set_volume(vol as i64).is_ok() {
                         tx.send(AppCommand::VolumeUpdate(vol)).ok();
+                        mtx.send(MprisCommand::VolumeUpdate(vol)).ok();
                         volume = vol as i64;
                     }
                 }
