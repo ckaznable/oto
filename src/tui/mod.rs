@@ -1,6 +1,6 @@
 use enclose::enclose;
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     rc::Rc,
     sync::mpsc::{Receiver, Sender},
 };
@@ -17,9 +17,12 @@ use ratatui::{
 
 use crate::{
     event::{AppCommand, PlayerCommand},
-    tui::state_bar::StateBar,
+    media::{MediaSpec, TrackMeta},
+    tui::{media_info::MediaInfo, state_bar::StateBar},
 };
 
+pub mod media_info;
+pub mod queue_list;
 pub mod state_bar;
 
 #[derive(Clone, Copy, Default, Display)]
@@ -44,11 +47,18 @@ pub struct PlayingState {
     duration: u64,
 }
 
+#[derive(Default)]
+pub struct PlayingTrack {
+    track: TrackMeta,
+    spec: MediaSpec,
+}
+
 #[derive(Clone, Default)]
 pub struct AppState {
     app_mode: Rc<Cell<AppMode>>,
     play_mode: Rc<Cell<PlayMode>>,
     playing: Rc<Cell<PlayingState>>,
+    playing_track: Rc<RefCell<PlayingTrack>>,
     volume: Rc<Cell<u8>>,
 }
 
@@ -95,8 +105,8 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::VolumeUpdate(vol) => {
                     state.volume.set(vol);
                 }
-                AppCommand::TrackUpdate(track) => {
-
+                AppCommand::TrackUpdate(track, spec) => {
+                    *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 }
             },
         }
@@ -105,13 +115,15 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
 
 fn render(frame: &mut Frame, mut state: AppState) {
     let area = frame.area();
-    let layout = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ]);
+    let layout = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]);
 
-    let [top, middle, bottom] = layout.areas(area);
+    let [content, bottom] = layout.areas(area);
+
+    let layout = Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)]);
+
+    let [media_info, queue] = layout.areas(content);
+
+    frame.render_stateful_widget(MediaInfo, media_info, &mut state);
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 

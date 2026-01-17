@@ -5,8 +5,9 @@ use lofty::{file::TaggedFileExt, probe::Probe};
 use crate::{decoder::DsfReader, util::get_cover_with_root_path};
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum OutputMode {
+    #[default]
     PCM,
     DSD,
 }
@@ -18,7 +19,7 @@ pub struct Album {
     pub track: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
 pub struct MediaSpec {
     pub sample_rate: u32,
     pub duration: Option<u64>,

@@ -1,4 +1,7 @@
-use crate::{media::TrackMeta, tui::AppMode};
+use crate::{
+    media::{MediaSpec, TrackMeta},
+    tui::AppMode,
+};
 
 #[derive(Clone)]
 pub enum PlayerCommand {
@@ -19,12 +22,12 @@ pub enum AppCommand {
     TimeUpdate(f64, Option<u64>),
     AppModeUpdate(AppMode),
     VolumeUpdate(u8),
-    TrackUpdate(TrackMeta),
+    TrackUpdate(TrackMeta, MediaSpec),
 }
 
 #[derive(Clone)]
 pub enum MprisCommand {
-    TrackUpdate(TrackMeta),
+    TrackUpdate(TrackMeta, MediaSpec),
     PlayBackStateUpdate(f64, bool),
     VolumeUpdate(u8),
 }

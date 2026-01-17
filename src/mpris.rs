@@ -50,7 +50,7 @@ impl Mpris {
             loop {
                 if let Ok(event) = rx.recv() {
                     match event {
-                        MprisCommand::TrackUpdate(track) => {
+                        MprisCommand::TrackUpdate(track, _) => {
                             let cover_url = track.cover().and_then(|data| {
                                 let cover_file_path =
                                     PROJ_DIRS.cache_dir().join(COVER_CACHE_FILE_NAME);

@@ -3,7 +3,9 @@ use log::LevelFilter;
 use os_pipe::{PipeWriter, pipe};
 use simplelog::WriteLogger;
 use std::{
-    io::{BufRead, BufReader}, path::PathBuf, sync::mpsc::{Receiver, Sender, channel}
+    io::{BufRead, BufReader},
+    path::PathBuf,
+    sync::mpsc::{Receiver, Sender, channel},
 };
 
 use alsa::pcm::State;
@@ -72,7 +74,9 @@ fn redirect_stderr_to_log() -> Redirect<PipeWriter> {
         let mut line = String::new();
 
         while let Ok(len) = buf_reader.read_line(&mut line) {
-            if len == 0 { break; }
+            if len == 0 {
+                break;
+            }
 
             let clean_line = line.trim();
             if !clean_line.is_empty() {
@@ -95,8 +99,10 @@ fn player_event_loop(
     let mut player = BufferPlayer::new(path)?;
     player.init()?;
 
+    let init_spec = player.spec.unwrap();
+
     let mut output = AudioOutput::new(&device)?;
-    output.init(player.spec.unwrap())?;
+    output.init(init_spec)?;
 
     let vc = VolumeController::new(&device);
     let mut volume = vc.get_volume().unwrap_or(0);
@@ -106,8 +112,9 @@ fn player_event_loop(
 
     let mut current_time = 0.;
     if let Some(track) = player.current() {
-        tx.send(AppCommand::TrackUpdate(track.clone())).ok();
-        mtx.send(MprisCommand::TrackUpdate(track)).ok();
+        tx.send(AppCommand::TrackUpdate(track.clone(), init_spec))
+            .ok();
+        mtx.send(MprisCommand::TrackUpdate(track, init_spec)).ok();
         mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
             .ok();
     }
@@ -172,8 +179,10 @@ fn player_event_loop(
                         player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
-                        tx.send(AppCommand::TrackUpdate(track.clone())).ok();
-                        mtx.send(MprisCommand::TrackUpdate(track)).ok();
+
+                        let spec = player.spec.unwrap_or_default();
+                        tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
+                        mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
                 PlayerCommand::PrevSong => {
@@ -181,8 +190,10 @@ fn player_event_loop(
                         player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
-                        tx.send(AppCommand::TrackUpdate(track.clone())).ok();
-                        mtx.send(MprisCommand::TrackUpdate(track)).ok();
+
+                        let spec = player.spec.unwrap_or_default();
+                        tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
+                        mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
             }
