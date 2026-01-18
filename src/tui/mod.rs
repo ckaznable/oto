@@ -14,6 +14,7 @@ use ratatui::{
         event::{Event, KeyCode, KeyEvent},
     },
     layout::{Constraint, Layout},
+    widgets::Block,
 };
 
 use crate::{
@@ -140,6 +141,12 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
 
 fn render(frame: &mut Frame, mut state: AppState) {
     let area = frame.area();
+
+    frame.render_widget(
+        Block::default().style(ratatui::style::Style::default().bg(state.theme.base)),
+        area,
+    );
+
     let layout = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]);
 
     let [content, bottom] = layout.areas(area);
@@ -148,7 +155,7 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     let [media_info, queue] = layout.areas(content);
 
-    frame.render_stateful_widget(MediaInfo, media_info, &mut state);
+    frame.render_stateful_widget(MediaInfo::default(), media_info, &mut state);
     frame.render_stateful_widget(QueueList, queue, &mut state);
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }

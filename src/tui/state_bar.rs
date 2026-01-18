@@ -3,6 +3,7 @@ use ratatui::{
     prelude::*,
     widgets::StatefulWidget,
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::tui::AppState;
 
@@ -88,6 +89,62 @@ impl TriangleSegment {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SegmentData {
+    pub content: String,
+    pub fg: Color,
+    pub bg: Color,
+}
+
+impl SegmentData {
+    pub fn new<S: Into<String>>(content: S, fg: Color, bg: Color) -> Self {
+        Self {
+            content: content.into(),
+            fg,
+            bg,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TriangleSegmentGroup {
+    segments: Vec<SegmentData>,
+}
+
+impl TriangleSegmentGroup {
+    pub fn add_segment(mut self, content: String, fg: Color, bg: Color) -> Self {
+        self.segments.push(SegmentData::new(content, fg, bg));
+        self
+    }
+
+    pub fn from_segments(segments: Vec<SegmentData>) -> Self {
+        Self { segments }
+    }
+
+    pub fn constraints(&self) -> Vec<Constraint> {
+        self.segments
+            .iter()
+            .map(|seg| Constraint::Length((seg.content.width() + 1) as u16))
+            .collect()
+    }
+
+    pub fn render(&self, areas: &[Rect], buf: &mut Buffer, tail_bg: Color) {
+        for (i, (seg, area)) in self.segments.iter().zip(areas.iter()).enumerate() {
+            let next_bg = if i + 1 < self.segments.len() {
+                self.segments[i + 1].bg
+            } else {
+                tail_bg
+            };
+
+            TriangleSegment::new(seg.content.clone())
+                .fg(seg.fg)
+                .bg(seg.bg)
+                .with_triangle(TriangleDirection::Right, next_bg)
+                .render(*area, buf);
+        }
+    }
+}
+
 pub struct StateBar;
 
 impl StatefulWidget for StateBar {
@@ -96,6 +153,7 @@ impl StatefulWidget for StateBar {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = &state.theme;
         let app_mode_str = state.app_mode.get().to_string();
+        let app_mode_formatted = format!(" {app_mode_str} ");
 
         let vol_icon = match state.volume.get() {
             0 => "",
@@ -104,9 +162,34 @@ impl StatefulWidget for StateBar {
         };
 
         let vol_str = format!(" {} {}% ", vol_icon, state.volume.get());
-        let vol_len = vol_str.len() + 2;
 
-        let app_mode_len = app_mode_str.len() + 3;
+        let play_mode_icon = match state.play_mode.get() {
+            crate::tui::PlayMode::Normal => "➡",
+            crate::tui::PlayMode::Loop => "",
+            crate::tui::PlayMode::LoopCurrent => "",
+        };
+        let play_mode_str = format!(" {} ", play_mode_icon);
+
+        let track = state.playing_track.borrow();
+        let sr = track.spec.sample_rate;
+        let sample_rate_str = if sr >= 1_000_000 {
+            format!(" {:.1}M ", (sr as f64 / 1_000_000.0 * 10.).trunc() / 10.)
+        } else if sr >= 1_000 {
+            format!(" {:.1}k ", (sr as f64 / 1_000.0 * 10.).trunc() / 10.)
+        } else {
+            format!(" {}Hz ", sr)
+        };
+
+        let sample_rate_color = if sr >= 2_822_400 {
+            theme.sample_rate_dsd
+        } else if sr >= 176_400 {
+            theme.sample_rate_ultrahires
+        } else if sr >= 88_200 {
+            theme.sample_rate_hires
+        } else {
+            theme.sample_rate_cd
+        };
+        drop(track);
 
         let playing = state.playing.get();
         let current_time = format!(
@@ -114,15 +197,6 @@ impl StatefulWidget for StateBar {
             (playing.current / 60.).floor(),
             (playing.current % 60.).floor()
         );
-        let timer_len = current_time.len() + 1;
-
-        let layout = Layout::horizontal([
-            Constraint::Length((app_mode_len + timer_len) as u16),
-            Constraint::Fill(1),
-            Constraint::Length(vol_len as u16),
-        ]);
-
-        let [left, middle, right] = layout.areas(area);
 
         let mode_color = match state.app_mode.get() {
             crate::tui::AppMode::Normal => (theme.mode_normal_fg, theme.mode_normal_bg),
@@ -130,57 +204,27 @@ impl StatefulWidget for StateBar {
             crate::tui::AppMode::Paused => (theme.mode_paused_fg, theme.mode_paused_bg),
         };
 
-        TriangleSegment::new(format!(" {app_mode_str} "))
-            .fg(mode_color.0)
-            .bg(mode_color.1)
-            .with_triangle(TriangleDirection::Right, theme.timer_bg)
-            .render(left, buf);
-
         let arrow_bg = if state.playing.get().current > 0. {
             theme.progress_active_bg
         } else {
             theme.progress_inactive_bg
         };
 
-        TriangleSegment::new(current_time)
-            .fg(theme.timer_fg)
-            .bg(theme.timer_bg)
-            .with_triangle(TriangleDirection::Right, arrow_bg)
-            .render(
-                Rect {
-                    x: left.x + app_mode_len as u16,
-                    y: left.y,
-                    width: timer_len as u16,
-                    height: 1,
-                },
-                buf,
-            );
+        let group = TriangleSegmentGroup::default()
+            .add_segment(app_mode_formatted, mode_color.0, mode_color.1)
+            .add_segment(sample_rate_str, sample_rate_color, theme.sample_rate_bg)
+            .add_segment(vol_str, theme.text, theme.volume_bg)
+            .add_segment(play_mode_str, theme.text, theme.volume_icon_bg)
+            .add_segment(current_time, theme.timer_fg, theme.timer_bg);
 
-        let layout = Layout::horizontal([
-            Constraint::Length(3),
-            Constraint::Length(vol_str.len() as u16),
-        ]);
-        let [left, right] = layout.areas(right);
+        let mut constraints = group.constraints();
+        constraints.push(Constraint::Fill(1));
 
-        TriangleSegment::new(vol_str)
-            .bg(theme.volume_bg)
-            .with_triangle(TriangleDirection::Left, theme.volume_icon_bg)
-            .render(right, buf);
+        let layout = Layout::horizontal(constraints).split(area);
 
-        let line = Line::from(vec![Span::styled(
-            format!(
-                " {} ",
-                match state.play_mode.get() {
-                    crate::tui::PlayMode::Normal => "➡",
-                    crate::tui::PlayMode::Loop => "",
-                    crate::tui::PlayMode::LoopCurrent => "",
-                }
-            ),
-            Style::new().bg(theme.volume_icon_bg),
-        )]);
-        line.render(left, buf);
+        group.render(&layout[0..5], buf, arrow_bg);
 
-        ProgressBar.render(middle, buf, state);
+        ProgressBar.render(layout[5], buf, state);
     }
 }
 

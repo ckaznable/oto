@@ -1902,6 +1902,7 @@ dependencies = [
  "symphonia",
  "tempfile",
  "thiserror 2.0.17",
+ "unicode-width",
  "walkdir",
 ]
 

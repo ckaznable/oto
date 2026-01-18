@@ -1,48 +1,59 @@
 use ratatui::{
     layout::Constraint,
     prelude::*,
-    widgets::{Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Paragraph, Widget},
 };
 
 use crate::tui::AppState;
 
-pub struct MediaInfo;
+pub struct MediaInfo {
+    pub border: bool,
+}
+
+impl Default for MediaInfo {
+    fn default() -> Self {
+        Self { border: true }
+    }
+}
 
 impl StatefulWidget for MediaInfo {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = &state.theme;
+
+        let block = if self.border {
+            Block::default()
+                .borders(Borders::RIGHT)
+                .border_type(BorderType::QuadrantInside)
+                .border_style(Style::default().fg(theme.mantle))
+                .style(Style::default().bg(theme.mantle))
+        } else {
+            Block::default().style(Style::default().bg(theme.mantle))
+        };
+
+        let inner = block.inner(area);
+        block.render(area, buf);
+
         let track = state.playing_track.borrow();
-        let sr = track.spec.sample_rate;
         let track = &track.track;
 
         let title = track.title.as_deref().unwrap_or("Unknown");
         let album = track.album.name.as_deref().unwrap_or("Unknown");
         let artist = track.artist.as_deref().unwrap_or("Unknown");
 
-        let sample_rate_str = if sr >= 1_000_000 {
-            format!("{:.1} MHz", ((sr as f64 / 1_000_000.0) * 10.).trunc() / 10.)
-        } else if sr >= 1_000 {
-            format!("{:.1} kHz", ((sr as f64 / 1_000.0) * 10.).trunc() / 10.)
-        } else {
-            format!("{} Hz", sr)
-        };
-
         let title_height = 1;
         let artist_height = 1;
         let album_height = 1;
-        let sample_rate_height = 1;
-        let spacing = 3;
+        let spacing = 2;
 
-        let total_height =
-            title_height + artist_height + album_height + sample_rate_height + spacing;
+        let total_height = title_height + artist_height + album_height + spacing;
 
-        if area.height < total_height {
-            let text = format!("{}\n{}\n{}\n{}", title, artist, album, sample_rate_str);
+        if inner.height < total_height {
+            let text = format!("{}\n{}\n{}", title, artist, album);
             Paragraph::new(text)
                 .alignment(Alignment::Center)
-                .render(area, buf);
+                .render(inner, buf);
             return;
         }
 
@@ -52,12 +63,10 @@ impl StatefulWidget for MediaInfo {
             Constraint::Length(artist_height),
             Constraint::Length(1),
             Constraint::Length(album_height),
-            Constraint::Length(1),
-            Constraint::Length(sample_rate_height),
             Constraint::Fill(1),
         ]);
 
-        let areas = layout.split(area);
+        let areas = layout.split(inner);
 
         Paragraph::new(title)
             .style(Style::default().fg(theme.media_title).bold())
@@ -73,10 +82,5 @@ impl StatefulWidget for MediaInfo {
             .style(Style::default().fg(theme.media_album))
             .alignment(Alignment::Center)
             .render(areas[4], buf);
-
-        Paragraph::new(sample_rate_str)
-            .style(Style::default().fg(theme.media_sample_rate))
-            .alignment(Alignment::Center)
-            .render(areas[6], buf);
     }
 }
