@@ -89,6 +89,7 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
 
     loop {
         if should_render {
+            timer = Instant::now();
             terminal.draw(enclose!((state) move |f| render(f, state)))?;
         }
 
@@ -112,6 +113,7 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                     state.volume.set(vol);
                 }
                 AppCommand::TrackUpdate(track, spec) => {
+                    log::info!("playing: {:?}", &track);
                     *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 }
             }
@@ -119,7 +121,6 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
 
         let refresh_time = timer.elapsed();
         should_render = refresh_time > min_refresh_duration;
-        timer = Instant::now();
     }
 }
 
