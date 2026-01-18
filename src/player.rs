@@ -11,6 +11,7 @@ use alsa::{
     pcm::{HwParams, State},
 };
 use bytemuck::cast_slice;
+use id3::TagLike;
 use lofty::{
     file::{AudioFile, TaggedFileExt},
     probe::Probe,
@@ -25,7 +26,7 @@ use ringbuf::{
 use walkdir::WalkDir;
 
 use crate::{
-    decoder::{Decoder, DecoderError, MixDecoder},
+    decoder::{Decoder, DecoderError, DsfReader, MixDecoder},
     media::{Album, MediaSpec, OutputMode, TrackMeta},
     shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
@@ -308,8 +309,9 @@ impl BufferPlayer {
             Some(MediaSpec {
                 sample_rate,
                 mode: OutputMode::DSD,
+                channels,
                 ..
-            }) => (self.written_sample_count * 32, sample_rate),
+            }) => (self.written_sample_count * 32 / channels as u64, sample_rate),
         };
 
         let actual_played_frames = written_frames.saturating_sub(delay);
@@ -335,8 +337,8 @@ impl PlayList {
             return list;
         }
 
-        if p.is_file() {
-            list.list.push(TrackMeta::empty(p));
+        if p.is_file() && let Some(track) = parse_one_file(&p) {
+            list.list.push(track);
         } else {
             list.list = scan_music_library(&p);
         }
@@ -387,19 +389,49 @@ pub fn scan_music_library(root_path: &Path) -> Vec<TrackMeta> {
         })
         .collect();
 
+    log::info!("found media files: {}", files.len());
+
     let tracks: Vec<TrackMeta> = files
         .par_iter()
         .map(|entry| {
             let path = entry.path();
             parse_one_file(path)
         })
-        .filter_map(|res| res)
+        .flatten()
         .collect();
+
+    log::info!("found tracks: {}", tracks.len());
 
     tracks
 }
 
+pub fn parse_dsf_file(path: &Path) -> Option<TrackMeta> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let reader = DsfReader::new(&mut file);
+    let metadata = reader.parse().ok()?;
+    let duration_secs = (metadata.sample_count / metadata.channel_num as u64) / metadata.sample_freq as u64;
+    let tag = metadata.tag?;
+
+    let track = TrackMeta {
+        path: path.to_owned(),
+        title: tag.title().map(|a| a.to_string()),
+        artist: tag.artist().map(|a| a.to_string()),
+        album: Album {
+            name: tag.album().map(|a| a.to_string()),
+            year: tag.year().map(|a| a as u32),
+            track: tag.track(),
+        },
+        duration_secs,
+    };
+
+    Some(track)
+}
+
 pub fn parse_one_file(path: &Path) -> Option<TrackMeta> {
+    if let Some(ext) = path.extension() && ext == "dsf" {
+        return parse_dsf_file(path);
+    }
+
     let tagged_file = Probe::open(path).ok()?.read().ok()?;
 
     let tag = tagged_file
