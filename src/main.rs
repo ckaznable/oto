@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     let (mpris_tx, mpris_rx) = channel();
     let (app_tx, app_rx) = channel();
 
-    // let _mpris = mpris::Mpris::handle(player_tx.clone(), mpris_rx)?;
+    let _mpris = mpris::Mpris::handle(player_tx.clone(), mpris_rx)?;
 
     match args.command {
         cli::Commands::Play { path, device } => {
