@@ -3,22 +3,18 @@ use ratatui::{
     widgets::{List, ListItem, Widget},
 };
 
-use crate::media::TrackMeta;
+use crate::tui::AppState;
 
-pub struct QueueList<'a> {
-    tracks: &'a [TrackMeta],
-}
+pub struct QueueList;
 
-impl<'a> QueueList<'a> {
-    pub fn new(tracks: &'a [TrackMeta]) -> Self {
-        Self { tracks }
-    }
-}
+impl StatefulWidget for QueueList {
+    type State = AppState;
 
-impl Widget for QueueList<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let items: Vec<ListItem> = self
-            .tracks
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let playlist = state.playlist.borrow();
+
+        let items: Vec<ListItem> = playlist
+            .list
             .iter()
             .map(|track| {
                 let title = track.title.as_deref().unwrap_or("Unknown");

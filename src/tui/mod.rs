@@ -16,9 +16,7 @@ use ratatui::{
 };
 
 use crate::{
-    event::{AppCommand, PlayerCommand},
-    media::{MediaSpec, TrackMeta},
-    tui::{media_info::MediaInfo, state_bar::StateBar},
+    event::{AppCommand, PlayerCommand}, media::{MediaSpec, TrackMeta}, player::PlayList, tui::{media_info::MediaInfo, queue_list::QueueList, state_bar::StateBar}
 };
 
 pub mod media_info;
@@ -59,6 +57,7 @@ pub struct AppState {
     play_mode: Rc<Cell<PlayMode>>,
     playing: Rc<Cell<PlayingState>>,
     playing_track: Rc<RefCell<PlayingTrack>>,
+    playlist: Rc<RefCell<PlayList>>,
     volume: Rc<Cell<u8>>,
 }
 
@@ -116,6 +115,9 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                     log::info!("playing: {:?}", &track);
                     *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 }
+                AppCommand::PlaylistUpdate(list) => {
+                    *state.playlist.borrow_mut() = list;
+                }
             }
         }
 
@@ -130,11 +132,12 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     let [content, bottom] = layout.areas(area);
 
-    let layout = Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)]);
+    let layout = Layout::horizontal([Constraint::Length(50), Constraint::Fill(1)]);
 
     let [media_info, queue] = layout.areas(content);
 
     frame.render_stateful_widget(MediaInfo, media_info, &mut state);
+    frame.render_stateful_widget(QueueList, queue, &mut state);
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 

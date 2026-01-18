@@ -114,6 +114,8 @@ fn player_event_loop(
     if let Some(track) = player.current() {
         tx.send(AppCommand::TrackUpdate(track.clone(), init_spec))
             .ok();
+        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+            .ok();
         mtx.send(MprisCommand::TrackUpdate(track, init_spec)).ok();
         mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
             .ok();

@@ -1,6 +1,5 @@
 use crate::{
-    media::{MediaSpec, TrackMeta},
-    tui::AppMode,
+    media::{MediaSpec, TrackMeta}, player::PlayList, tui::AppMode
 };
 
 #[derive(Clone)]
@@ -23,6 +22,7 @@ pub enum AppCommand {
     AppModeUpdate(AppMode),
     VolumeUpdate(u8),
     TrackUpdate(TrackMeta, MediaSpec),
+    PlaylistUpdate(PlayList),
 }
 
 #[derive(Clone)]

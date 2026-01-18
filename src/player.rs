@@ -1,7 +1,7 @@
 use std::{
     collections::VecDeque,
     ops::Deref,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, sync::Arc,
 };
 
 use anyhow::{Result, anyhow};
@@ -151,8 +151,8 @@ pub struct BufferPlayer {
     buf: VecDeque<i32>,
     decoder: MixDecoder,
     eof: bool,
-    playlist: PlayList,
     written_sample_count: u64,
+    pub playlist: PlayList,
     pub spec: Option<MediaSpec>,
 }
 
@@ -319,31 +319,31 @@ impl BufferPlayer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PlayList {
-    list: Vec<TrackMeta>,
-    index: usize,
+    pub list: Arc<Vec<TrackMeta>>,
+    pub index: usize,
 }
 
 impl PlayList {
     pub fn new(p: impl Into<PathBuf>) -> Self {
         let p = p.into();
-        let mut list = Self {
-            list: vec![],
-            index: 0,
-        };
+        let mut list = vec![];
 
         if !p.exists() {
-            return list;
+            return Self::default();
         }
 
         if p.is_file() && let Some(track) = parse_one_file(&p) {
-            list.list.push(track);
+            list.push(track);
         } else {
-            list.list = scan_music_library(&p);
+            list = scan_music_library(&p);
         }
 
-        list
+        Self {
+            list: Arc::new(list),
+            index: 0,
+        }
     }
 
     #[allow(clippy::should_implement_trait)]
