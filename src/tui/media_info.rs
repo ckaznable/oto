@@ -21,9 +21,9 @@ impl StatefulWidget for MediaInfo {
         let artist = track.artist.as_deref().unwrap_or("Unknown");
 
         let sample_rate_str = if sr >= 1_000_000 {
-            format!("{:.1} MHz", sr as f64 / 1_000_000.0)
+            format!("{:.1} MHz", ((sr as f64 / 1_000_000.0) * 10.).trunc() / 10.)
         } else if sr >= 1_000 {
-            format!("{:.1} kHz", sr as f64 / 1_000.0)
+            format!("{:.1} kHz", ((sr as f64 / 1_000.0) * 10.).trunc() / 10.)
         } else {
             format!("{} Hz", sr)
         };
