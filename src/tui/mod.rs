@@ -2,7 +2,8 @@ use enclose::enclose;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
-    sync::mpsc::{Receiver, Sender}, time::{Duration, Instant},
+    sync::mpsc::{Receiver, Sender},
+    time::{Duration, Instant},
 };
 use strum::Display;
 
@@ -16,7 +17,10 @@ use ratatui::{
 };
 
 use crate::{
-    event::{AppCommand, PlayerCommand}, media::{MediaSpec, TrackMeta}, player::PlayList, tui::{media_info::MediaInfo, queue_list::QueueList, state_bar::StateBar}
+    event::{AppCommand, PlayerCommand},
+    media::{MediaSpec, TrackMeta},
+    player::PlayList,
+    tui::{media_info::MediaInfo, queue_list::QueueList, state_bar::StateBar},
 };
 
 pub mod media_info;
@@ -118,7 +122,7 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 AppCommand::PlaylistUpdate(list) => {
                     *state.playlist.borrow_mut() = list;
                 }
-            }
+            },
         }
 
         let refresh_time = timer.elapsed();
