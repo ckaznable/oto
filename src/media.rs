@@ -52,7 +52,9 @@ impl TrackMeta {
     }
 
     pub fn cover(&self) -> Option<Vec<u8>> {
-        if let Some(ext) = self.path.extension() && ext == "dsf" {
+        if let Some(ext) = self.path.extension()
+            && ext == "dsf"
+        {
             return self.cover_dsf();
         }
 
@@ -64,8 +66,6 @@ impl TrackMeta {
         tag.pictures()
             .first()
             .map(|pic| pic.data().to_vec())
-            .or_else(|| {
-                Some(get_cover_with_root_path(&self.path)?.1)
-            })
+            .or_else(|| Some(get_cover_with_root_path(&self.path)?.1))
     }
 }
