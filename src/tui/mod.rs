@@ -20,12 +20,13 @@ use crate::{
     event::{AppCommand, PlayerCommand},
     media::{MediaSpec, TrackMeta},
     player::PlayList,
-    tui::{media_info::MediaInfo, queue_list::QueueList, state_bar::StateBar},
+    tui::{media_info::MediaInfo, queue_list::QueueList, state_bar::StateBar, theme::Theme},
 };
 
 pub mod media_info;
 pub mod queue_list;
 pub mod state_bar;
+pub mod theme;
 
 #[derive(Clone, Copy, Default, Display)]
 pub enum AppMode {
@@ -55,7 +56,7 @@ pub struct PlayingTrack {
     spec: MediaSpec,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AppState {
     app_mode: Rc<Cell<AppMode>>,
     play_mode: Rc<Cell<PlayMode>>,
@@ -63,12 +64,19 @@ pub struct AppState {
     playing_track: Rc<RefCell<PlayingTrack>>,
     playlist: Rc<RefCell<PlayList>>,
     volume: Rc<Cell<u8>>,
+    theme: Rc<Theme>,
 }
 
 impl AppState {
     fn new() -> Self {
         Self {
-            ..Default::default()
+            app_mode: Rc::new(Cell::new(AppMode::default())),
+            play_mode: Rc::new(Cell::new(PlayMode::default())),
+            playing: Rc::new(Cell::new(PlayingState::default())),
+            playing_track: Rc::new(RefCell::new(PlayingTrack::default())),
+            playlist: Rc::new(RefCell::new(PlayList::default())),
+            volume: Rc::new(Cell::new(0)),
+            theme: Rc::new(Theme::default()),
         }
     }
 }

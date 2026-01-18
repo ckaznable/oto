@@ -11,6 +11,7 @@ impl StatefulWidget for QueueList {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let theme = &state.theme;
         let playlist = state.playlist.borrow();
 
         let items: Vec<ListItem> = playlist
@@ -26,10 +27,10 @@ impl StatefulWidget for QueueList {
                     .unwrap_or_default();
 
                 let line = Line::from(vec![
-                    Span::styled(title, Style::default().fg(Color::White)),
+                    Span::styled(title, Style::default().fg(theme.queue_title)),
                     Span::raw(" - "),
-                    Span::styled(album, Style::default().fg(Color::Yellow)),
-                    Span::styled(year, Style::default().fg(Color::Gray)),
+                    Span::styled(album, Style::default().fg(theme.queue_album)),
+                    Span::styled(year, Style::default().fg(theme.queue_year)),
                 ]);
 
                 ListItem::new(line)

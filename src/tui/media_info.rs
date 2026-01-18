@@ -12,6 +12,7 @@ impl StatefulWidget for MediaInfo {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let theme = &state.theme;
         let track = state.playing_track.borrow();
         let sr = track.spec.sample_rate;
         let track = &track.track;
@@ -59,22 +60,22 @@ impl StatefulWidget for MediaInfo {
         let areas = layout.split(area);
 
         Paragraph::new(title)
-            .style(Style::default().fg(Color::Cyan).bold())
+            .style(Style::default().fg(theme.media_title).bold())
             .alignment(Alignment::Center)
             .render(areas[0], buf);
 
         Paragraph::new(format!("by {}", artist))
-            .style(Style::default().fg(Color::Gray))
+            .style(Style::default().fg(theme.media_artist))
             .alignment(Alignment::Center)
             .render(areas[2], buf);
 
         Paragraph::new(album)
-            .style(Style::default().fg(Color::Yellow))
+            .style(Style::default().fg(theme.media_album))
             .alignment(Alignment::Center)
             .render(areas[4], buf);
 
         Paragraph::new(sample_rate_str)
-            .style(Style::default().fg(Color::Green))
+            .style(Style::default().fg(theme.media_sample_rate))
             .alignment(Alignment::Center)
             .render(areas[6], buf);
     }

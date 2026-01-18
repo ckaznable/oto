@@ -94,6 +94,7 @@ impl StatefulWidget for StateBar {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let theme = &state.theme;
         let app_mode_str = state.app_mode.get().to_string();
 
         let vol_icon = match state.volume.get() {
@@ -124,27 +125,26 @@ impl StatefulWidget for StateBar {
         let [left, middle, right] = layout.areas(area);
 
         let mode_color = match state.app_mode.get() {
-            crate::tui::AppMode::Normal => (Color::Reset, Color::Blue),
-            crate::tui::AppMode::Playing => (Color::Black, Color::Green),
-            crate::tui::AppMode::Paused => (Color::Black, Color::Red),
+            crate::tui::AppMode::Normal => (theme.mode_normal_fg, theme.mode_normal_bg),
+            crate::tui::AppMode::Playing => (theme.mode_playing_fg, theme.mode_playing_bg),
+            crate::tui::AppMode::Paused => (theme.mode_paused_fg, theme.mode_paused_bg),
         };
-        let timer_color = Color::Magenta;
 
         TriangleSegment::new(format!(" {app_mode_str} "))
             .fg(mode_color.0)
             .bg(mode_color.1)
-            .with_triangle(TriangleDirection::Right, timer_color)
+            .with_triangle(TriangleDirection::Right, theme.timer_bg)
             .render(left, buf);
 
         let arrow_bg = if state.playing.get().current > 0. {
-            Color::White
+            theme.progress_active_bg
         } else {
-            Color::Reset
+            theme.progress_inactive_bg
         };
 
         TriangleSegment::new(current_time)
-            .fg(Color::Black)
-            .bg(timer_color)
+            .fg(theme.timer_fg)
+            .bg(theme.timer_bg)
             .with_triangle(TriangleDirection::Right, arrow_bg)
             .render(
                 Rect {
@@ -163,17 +163,20 @@ impl StatefulWidget for StateBar {
         let [left, right] = layout.areas(right);
 
         TriangleSegment::new(vol_str)
-            .bg(Color::Blue)
-            .with_triangle(TriangleDirection::Left, Color::Cyan)
+            .bg(theme.volume_bg)
+            .with_triangle(TriangleDirection::Left, theme.volume_icon_bg)
             .render(right, buf);
 
         let line = Line::from(vec![Span::styled(
-            format!(" {} ", match state.play_mode.get() {
-                crate::tui::PlayMode::Normal => "➡",
-                crate::tui::PlayMode::Loop => "",
-                crate::tui::PlayMode::LoopCurrent => "",
-            }),
-            Style::new().bg(Color::Cyan),
+            format!(
+                " {} ",
+                match state.play_mode.get() {
+                    crate::tui::PlayMode::Normal => "➡",
+                    crate::tui::PlayMode::Loop => "",
+                    crate::tui::PlayMode::LoopCurrent => "",
+                }
+            ),
+            Style::new().bg(theme.volume_icon_bg),
         )]);
         line.render(left, buf);
 
@@ -184,7 +187,7 @@ impl StatefulWidget for StateBar {
 pub struct ProgressBar;
 
 impl ProgressBar {
-    fn draw_cell(&self, x: u16, y: u16, buf: &mut Buffer, width: u8) {
+    fn draw_cell(&self, x: u16, y: u16, buf: &mut Buffer, width: u8, fg: Color) {
         if let Some(cell) = buf.cell_mut(Position::new(x, y)) {
             cell.set_char(match width {
                 1 => '▏',
@@ -198,7 +201,7 @@ impl ProgressBar {
                 _ => ' ',
             });
 
-            cell.set_fg(Color::White);
+            cell.set_fg(fg);
         }
     }
 }
@@ -207,6 +210,7 @@ impl StatefulWidget for ProgressBar {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let theme = &state.theme;
         let playing = state.playing.get();
         let ratio = (playing.current / playing.duration as f64).clamp(0.0, 1.0);
         let available_width = area.width as f64;
@@ -214,9 +218,15 @@ impl StatefulWidget for ProgressBar {
 
         let full_blocks = filled_width.floor() as u16;
         for i in 0..full_blocks {
-            self.draw_cell(area.x + i, area.y, buf, 8);
+            self.draw_cell(area.x + i, area.y, buf, 8, theme.progress_bar_fg);
         }
         let fraction = filled_width - filled_width.floor();
-        self.draw_cell(area.x + full_blocks, area.y, buf, (fraction * 8.0) as u8);
+        self.draw_cell(
+            area.x + full_blocks,
+            area.y,
+            buf,
+            (fraction * 8.0) as u8,
+            theme.progress_bar_fg,
+        );
     }
 }
