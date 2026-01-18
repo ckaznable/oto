@@ -44,7 +44,18 @@ impl TrackMeta {
         }
     }
 
+    pub fn cover_dsf(&self) -> Option<Vec<u8>> {
+        let mut file = std::fs::File::open(&self.path).ok()?;
+        let reader = DsfReader::new(&mut file);
+        let metadata = reader.parse().ok()?;
+        metadata.tag?.pictures().next().map(|p| p.data.clone())
+    }
+
     pub fn cover(&self) -> Option<Vec<u8>> {
+        if let Some(ext) = self.path.extension() && ext == "dsf" {
+            return self.cover_dsf();
+        }
+
         let tagged_file = Probe::open(&self.path).ok()?.read().ok()?;
         let tag = tagged_file
             .primary_tag()
@@ -54,13 +65,7 @@ impl TrackMeta {
             .first()
             .map(|pic| pic.data().to_vec())
             .or_else(|| {
-                let mut file = std::fs::File::open(&self.path).ok()?;
-                let reader = DsfReader::new(&mut file);
-                if let Ok(metadata) = reader.parse() {
-                    metadata.tag?.pictures().next().map(|p| p.data.clone())
-                } else {
-                    Some(get_cover_with_root_path(&self.path)?.1)
-                }
+                Some(get_cover_with_root_path(&self.path)?.1)
             })
     }
 }

@@ -219,6 +219,7 @@ impl Decoder for PcmDecoder {
     }
 }
 
+#[derive(Debug)]
 pub struct DsfMetadata {
     pub dsd_chunk_size: u64,
     pub fmt_chunk_size: u64,
