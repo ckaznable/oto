@@ -1,5 +1,7 @@
 use crate::{
-    media::{MediaSpec, TrackMeta}, player::PlayList, tui::AppMode
+    media::{MediaSpec, TrackMeta},
+    player::PlayList,
+    tui::AppMode,
 };
 
 #[derive(Clone)]

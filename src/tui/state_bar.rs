@@ -6,6 +6,88 @@ use ratatui::{
 
 use crate::tui::AppState;
 
+#[derive(Debug, Clone, Copy)]
+pub enum TriangleDirection {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone)]
+pub struct TriangleSegment {
+    content: String,
+    fg: Color,
+    bg: Color,
+    triangle: Option<(TriangleDirection, Color)>,
+}
+
+impl TriangleSegment {
+    pub fn new<S: Into<String>>(content: S) -> Self {
+        Self {
+            content: content.into(),
+            fg: Color::Reset,
+            bg: Color::Reset,
+            triangle: None,
+        }
+    }
+
+    pub fn fg(mut self, color: Color) -> Self {
+        self.fg = color;
+        self
+    }
+
+    pub fn bg(mut self, color: Color) -> Self {
+        self.bg = color;
+        self
+    }
+
+    pub fn with_triangle(mut self, direction: TriangleDirection, tail_bg: Color) -> Self {
+        self.triangle = Some((direction, tail_bg));
+        self
+    }
+
+    pub fn tail_bg(mut self, color: Color) -> Self {
+        if let Some((dir, _)) = self.triangle {
+            self.triangle = Some((dir, color));
+        }
+        self
+    }
+
+    pub fn build(self) -> Vec<Span<'static>> {
+        let mut spans = Vec::new();
+
+        if let Some((direction, tail_bg)) = self.triangle {
+            match direction {
+                TriangleDirection::Left => {
+                    spans.push(Span::styled("", Style::new().fg(self.bg).bg(tail_bg)));
+                    spans.push(Span::styled(
+                        self.content,
+                        Style::new().fg(self.fg).bg(self.bg),
+                    ));
+                }
+                TriangleDirection::Right => {
+                    spans.push(Span::styled(
+                        self.content,
+                        Style::new().fg(self.fg).bg(self.bg),
+                    ));
+                    spans.push(Span::styled("", Style::new().fg(self.bg).bg(tail_bg)));
+                }
+            }
+        } else {
+            spans.push(Span::styled(
+                self.content,
+                Style::new().fg(self.fg).bg(self.bg),
+            ));
+        }
+
+        spans
+    }
+
+    pub fn render(self, area: Rect, buf: &mut Buffer) {
+        let spans = self.build();
+        Line::from(spans).render(area, buf);
+    }
+}
+
 pub struct StateBar;
 
 impl StatefulWidget for StateBar {
@@ -48,14 +130,11 @@ impl StatefulWidget for StateBar {
         };
         let timer_color = Color::Magenta;
 
-        let line = Line::from(vec![
-            Span::styled(
-                format!(" {app_mode_str} "),
-                Style::new().fg(mode_color.0).bg(mode_color.1),
-            ),
-            Span::styled("", Style::new().fg(mode_color.1).bg(timer_color)),
-        ]);
-        line.render(left, buf);
+        TriangleSegment::new(format!(" {app_mode_str} "))
+            .fg(mode_color.0)
+            .bg(mode_color.1)
+            .with_triangle(TriangleDirection::Right, timer_color)
+            .render(left, buf);
 
         let arrow_bg = if state.playing.get().current > 0. {
             Color::White
@@ -63,19 +142,19 @@ impl StatefulWidget for StateBar {
             Color::Reset
         };
 
-        let line = Line::from(vec![
-            Span::styled(current_time, Style::new().bg(timer_color).fg(Color::Black)),
-            Span::styled("", Style::new().fg(timer_color).bg(arrow_bg)),
-        ]);
-        line.render(
-            Rect {
-                x: left.x + app_mode_len as u16,
-                y: left.y,
-                width: timer_len as u16,
-                height: 1,
-            },
-            buf,
-        );
+        TriangleSegment::new(current_time)
+            .fg(Color::Black)
+            .bg(timer_color)
+            .with_triangle(TriangleDirection::Right, arrow_bg)
+            .render(
+                Rect {
+                    x: left.x + app_mode_len as u16,
+                    y: left.y,
+                    width: timer_len as u16,
+                    height: 1,
+                },
+                buf,
+            );
 
         let layout = Layout::horizontal([
             Constraint::Length(3),
@@ -83,14 +162,17 @@ impl StatefulWidget for StateBar {
         ]);
         let [left, right] = layout.areas(right);
 
-        let line = Line::from(vec![
-            Span::styled("", Style::new().fg(Color::Blue).bg(Color::Cyan)),
-            Span::styled(vol_str, Style::new().bg(Color::Blue)),
-        ]);
-        line.render(right, buf);
+        TriangleSegment::new(vol_str)
+            .bg(Color::Blue)
+            .with_triangle(TriangleDirection::Left, Color::Cyan)
+            .render(right, buf);
 
         let line = Line::from(vec![Span::styled(
-            format!(" {} ", ""),
+            format!(" {} ", match state.play_mode.get() {
+                crate::tui::PlayMode::Normal => "➡",
+                crate::tui::PlayMode::Loop => "",
+                crate::tui::PlayMode::LoopCurrent => "",
+            }),
             Style::new().bg(Color::Cyan),
         )]);
         line.render(left, buf);

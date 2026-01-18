@@ -1,7 +1,8 @@
 use std::{
     collections::VecDeque,
     ops::Deref,
-    path::{Path, PathBuf}, sync::Arc,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{Result, anyhow};
@@ -311,7 +312,10 @@ impl BufferPlayer {
                 mode: OutputMode::DSD,
                 channels,
                 ..
-            }) => (self.written_sample_count * 32 / channels as u64, sample_rate),
+            }) => (
+                self.written_sample_count * 32 / channels as u64,
+                sample_rate,
+            ),
         };
 
         let actual_played_frames = written_frames.saturating_sub(delay);
@@ -334,7 +338,9 @@ impl PlayList {
             return Self::default();
         }
 
-        if p.is_file() && let Some(track) = parse_one_file(&p) {
+        if p.is_file()
+            && let Some(track) = parse_one_file(&p)
+        {
             list.push(track);
         } else {
             list = scan_music_library(&p);
@@ -409,7 +415,8 @@ pub fn parse_dsf_file(path: &Path) -> Option<TrackMeta> {
     let mut file = std::fs::File::open(path).ok()?;
     let reader = DsfReader::new(&mut file);
     let metadata = reader.parse().ok()?;
-    let duration_secs = (metadata.sample_count / metadata.channel_num as u64) / metadata.sample_freq as u64;
+    let duration_secs =
+        (metadata.sample_count / metadata.channel_num as u64) / metadata.sample_freq as u64;
     let tag = metadata.tag?;
 
     let track = TrackMeta {
@@ -428,7 +435,9 @@ pub fn parse_dsf_file(path: &Path) -> Option<TrackMeta> {
 }
 
 pub fn parse_one_file(path: &Path) -> Option<TrackMeta> {
-    if let Some(ext) = path.extension() && ext == "dsf" {
+    if let Some(ext) = path.extension()
+        && ext == "dsf"
+    {
         return parse_dsf_file(path);
     }
 
