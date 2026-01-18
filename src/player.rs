@@ -145,6 +145,11 @@ impl From<anyhow::Error> for PlayerError {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum LastPlayerState {
+    PlayListChanged,
+}
+
 pub type PlayerResult = Result<usize, PlayerError>;
 
 pub struct BufferPlayer {
@@ -153,6 +158,7 @@ pub struct BufferPlayer {
     decoder: MixDecoder,
     eof: bool,
     written_sample_count: u64,
+    last_state: Option<LastPlayerState>,
     pub playlist: PlayList,
     pub spec: Option<MediaSpec>,
 }
@@ -170,6 +176,7 @@ impl BufferPlayer {
             buf,
             decoder,
             playlist,
+            last_state: None,
             spec: None,
             eof: false,
             written_sample_count: 0,
@@ -187,6 +194,10 @@ impl BufferPlayer {
     pub fn clear_buffer(&mut self) {
         self.rb.clear();
         self.buf.clear();
+    }
+
+    pub fn pop_state(&mut self) -> Option<LastPlayerState> {
+        self.last_state.take()
     }
 
     pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {

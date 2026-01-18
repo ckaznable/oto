@@ -15,7 +15,7 @@ use oto::{
     cli,
     event::{AppCommand, MprisCommand, PlayerCommand},
     mpris,
-    player::{AudioOutput, BufferPlayer, PlayerError},
+    player::{AudioOutput, BufferPlayer, LastPlayerState, PlayerError},
     volume::VolumeController,
 };
 
@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     let (mpris_tx, mpris_rx) = channel();
     let (app_tx, app_rx) = channel();
 
-    let _mpris = mpris::Mpris::handle(player_tx.clone(), mpris_rx)?;
+    // let _mpris = mpris::Mpris::handle(player_tx.clone(), mpris_rx)?;
 
     match args.command {
         cli::Commands::Play { path, device } => {
@@ -173,6 +173,7 @@ fn player_event_loop(
                 PlayerCommand::SetVolumn(vol) => {
                     if vc.set_volume(vol as i64).is_ok() {
                         tx.send(AppCommand::VolumeUpdate(vol)).ok();
+                        mtx.send(MprisCommand::VolumeUpdate(vol)).ok();
                         volume = vol as i64;
                     }
                 }
@@ -184,6 +185,7 @@ fn player_event_loop(
 
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
@@ -195,6 +197,7 @@ fn player_event_loop(
 
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
@@ -223,6 +226,16 @@ fn player_event_loop(
             player.spec.and_then(|s| s.duration),
         ))
         .ok();
+
+        match player.pop_state() {
+            Some(LastPlayerState::PlayListChanged) => {
+                if let Some(track) = player.current() {
+                    tx.send(AppCommand::TrackUpdate(track, player.spec.unwrap_or_default())).ok();
+                    tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
+                }
+            },
+            None => {},
+        }
 
         if let Err(PlayerError::EOF) = player.consume(&mut output) {
             break;

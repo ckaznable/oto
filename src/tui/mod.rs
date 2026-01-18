@@ -95,7 +95,7 @@ pub fn tui(
 fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Result<()> {
     let state = AppState::new();
 
-    let min_refresh_duration = Duration::from_secs_f64(1. / 60.);
+    let min_refresh_duration = Duration::from_secs_f64(1. / 30.);
     let mut timer = Instant::now();
     let mut should_render = true;
 

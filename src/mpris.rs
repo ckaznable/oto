@@ -37,7 +37,7 @@ impl Mpris {
                 MediaControlEvent::Next => tx.send(PlayerCommand::NextSong),
                 MediaControlEvent::Previous => tx.send(PlayerCommand::PrevSong),
                 MediaControlEvent::SetVolume(vol) => {
-                    tx.send(PlayerCommand::SetVolumn((vol * 100.).clamp(0., 100.) as u8))
+                    tx.send(PlayerCommand::SetVolumn((vol * 100.).clamp(0., 100.).floor() as u8))
                 }
                 _ => Ok(()),
             }
