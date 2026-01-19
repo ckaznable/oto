@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use lofty::{file::TaggedFileExt, probe::Probe};
+use lofty::{config::ParseOptions, file::TaggedFileExt, probe::Probe};
 
 use crate::{decoder::DsfReader, util::get_cover_with_root_path};
 
@@ -58,7 +58,8 @@ impl TrackMeta {
             return self.cover_dsf();
         }
 
-        let tagged_file = Probe::open(&self.path).ok()?.read().ok()?;
+        let options = ParseOptions::new().read_properties(false).read_tags(false);
+        let tagged_file = Probe::open(&self.path).ok()?.options(options).read().ok()?;
         let tag = tagged_file
             .primary_tag()
             .or_else(|| tagged_file.first_tag())?;
