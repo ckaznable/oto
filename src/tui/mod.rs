@@ -97,45 +97,52 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
 
     let min_refresh_duration = Duration::from_secs_f64(1. / 30.);
     let mut timer = Instant::now();
-    let mut should_render = true;
+
+    // first draw
+    terminal.draw(enclose!((state) move |f| render(f, state)))?;
 
     loop {
-        if should_render {
-            timer = Instant::now();
-            terminal.draw(enclose!((state) move |f| render(f, state)))?;
-        }
-
-        match rx.recv() {
+        let event = match rx.recv() {
+            Ok(e) => e,
             Err(_) => break Ok(()),
-            Ok(event) => match event {
-                AppCommand::Err(e) => log::error!("{e}"),
-                AppCommand::Unexcepted(e) => log::error!("{e}"),
-                AppCommand::End => break Ok(()),
-                AppCommand::TimeUpdate(current, duration) => {
-                    state.app_mode.set(AppMode::Playing);
-                    state.playing.set(PlayingState {
-                        current,
-                        duration: duration.unwrap_or(0),
-                    });
-                }
-                AppCommand::AppModeUpdate(mode) => {
-                    state.app_mode.set(mode);
-                }
-                AppCommand::VolumeUpdate(vol) => {
-                    state.volume.set(vol);
-                }
-                AppCommand::TrackUpdate(track, spec) => {
-                    log::info!("playing: {:?}", &track);
-                    *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
-                }
-                AppCommand::PlaylistUpdate(list) => {
-                    *state.playlist.borrow_mut() = list;
-                }
-            },
+        };
+
+        let mut force_render = false;
+
+        match event {
+            AppCommand::Err(e) => log::error!("{e}"),
+            AppCommand::Unexcepted(e) => log::error!("{e}"),
+            AppCommand::End => break Ok(()),
+            AppCommand::TimeUpdate(current, duration) => {
+                state.app_mode.set(AppMode::Playing);
+                state.playing.set(PlayingState {
+                    current,
+                    duration: duration.unwrap_or(0),
+                });
+            }
+            AppCommand::AppModeUpdate(mode) => {
+                state.app_mode.set(mode);
+                force_render = true;
+            }
+            AppCommand::VolumeUpdate(vol) => {
+                state.volume.set(vol);
+                force_render = true;
+            }
+            AppCommand::TrackUpdate(track, spec) => {
+                log::info!("playing: {:?}", &track);
+                *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
+                force_render = true;
+            }
+            AppCommand::PlaylistUpdate(list) => {
+                *state.playlist.borrow_mut() = list;
+                force_render = true;
+            }
         }
 
-        let refresh_time = timer.elapsed();
-        should_render = refresh_time > min_refresh_duration;
+        if force_render || timer.elapsed() >= min_refresh_duration {
+            terminal.draw(enclose!((state) move |f| render(f, state)))?;
+            timer = Instant::now();
+        }
     }
 }
 
