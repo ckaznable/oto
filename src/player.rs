@@ -14,6 +14,7 @@ use alsa::{
 use bytemuck::cast_slice;
 use id3::TagLike;
 use lofty::{
+    config::ParseOptions,
     file::{AudioFile, TaggedFileExt},
     probe::Probe,
     tag::Accessor,
@@ -452,7 +453,8 @@ pub fn parse_one_file(path: &Path) -> Option<TrackMeta> {
         return parse_dsf_file(path);
     }
 
-    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+    let options = ParseOptions::new().read_cover_art(false);
+    let tagged_file = Probe::open(path).ok()?.options(options).read().ok()?;
 
     let tag = tagged_file
         .primary_tag()
