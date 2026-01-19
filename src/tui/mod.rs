@@ -1,6 +1,7 @@
 use enclose::enclose;
 use std::{
     cell::{Cell, RefCell},
+    io::stdout,
     rc::Rc,
     sync::mpsc::{Receiver, Sender},
     time::{Duration, Instant},
@@ -12,6 +13,8 @@ use ratatui::{
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent},
+        execute,
+        terminal::SetTitle,
     },
     layout::{Constraint, Layout},
     widgets::Block,
@@ -130,6 +133,10 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
             }
             AppCommand::TrackUpdate(track, spec) => {
                 log::info!("playing: {:?}", &track);
+                if let Some(ref title) = track.title {
+                    execute!(stdout(), SetTitle(format!(" {title}"))).ok();
+                }
+
                 *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 force_render = true;
             }
