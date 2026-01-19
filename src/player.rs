@@ -298,9 +298,14 @@ impl BufferPlayer {
                     self.eof = true;
                 }
 
-                if let Err(e) = self.next() {
-                    log::error!("{e:?}");
-                    self.eof = true;
+                match self.next() {
+                    Err(e) => {
+                        log::error!("{e:?}");
+                        self.eof = true;
+                    }
+                    Ok(_) => {
+                        self.last_state.replace(LastPlayerState::PlayListChanged);
+                    }
                 }
             }
             _ => {}
