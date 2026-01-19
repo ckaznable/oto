@@ -161,12 +161,21 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     let [content, bottom] = layout.areas(area);
 
-    let layout = Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)]);
+    let layout = Layout::horizontal(if area.width > 120 {
+        [Constraint::Length(50), Constraint::Fill(1)]
+    } else if area.width <= 65 {
+        [Constraint::Fill(1), Constraint::Length(0)]
+    } else {
+        [Constraint::Length(30), Constraint::Fill(1)]
+    });
 
     let [media_info, queue] = layout.areas(content);
 
+    if area.width > 65 {
+        frame.render_stateful_widget(QueueList, queue, &mut state);
+    }
+
     frame.render_stateful_widget(MediaInfo::default(), media_info, &mut state);
-    frame.render_stateful_widget(QueueList, queue, &mut state);
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 
