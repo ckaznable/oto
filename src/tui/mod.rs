@@ -137,6 +137,9 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
                 *state.playlist.borrow_mut() = list;
                 force_render = true;
             }
+            AppCommand::Rerender(force) => {
+                force_render = force;
+            }
         }
 
         if force_render || timer.elapsed() >= min_refresh_duration {
@@ -158,7 +161,7 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     let [content, bottom] = layout.areas(area);
 
-    let layout = Layout::horizontal([Constraint::Length(50), Constraint::Fill(1)]);
+    let layout = Layout::horizontal([Constraint::Length(30), Constraint::Fill(1)]);
 
     let [media_info, queue] = layout.areas(content);
 
@@ -170,6 +173,9 @@ fn render(frame: &mut Frame, mut state: AppState) {
 fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
     loop {
         match crossterm::event::read() {
+            Ok(Event::Resize(_, _)) => {
+                tx.send(AppCommand::Rerender(false)).ok();
+            }
             Ok(Event::Key(event)) => match event {
                 KeyEvent {
                     code: KeyCode::Char('q'),

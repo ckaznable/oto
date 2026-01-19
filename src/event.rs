@@ -25,6 +25,7 @@ pub enum AppCommand {
     VolumeUpdate(u8),
     TrackUpdate(TrackMeta, MediaSpec),
     PlaylistUpdate(PlayList),
+    Rerender(bool),
 }
 
 #[derive(Clone)]
