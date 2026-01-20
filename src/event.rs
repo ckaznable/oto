@@ -26,6 +26,7 @@ pub enum AppCommand {
     TrackUpdate(TrackMeta, MediaSpec),
     PlaylistUpdate(PlayList),
     Rerender(bool),
+    MoveQueueCursor(i16),
 }
 
 #[derive(Clone)]

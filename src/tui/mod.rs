@@ -9,7 +9,6 @@ use std::{
 use strum::Display;
 
 use ratatui::{
-    DefaultTerminal, Frame,
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent},
@@ -18,17 +17,22 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     widgets::Block,
+    DefaultTerminal, Frame,
 };
 
 use crate::{
     event::{AppCommand, PlayerCommand},
     media::{MediaSpec, TrackMeta},
     player::PlayList,
-    tui::{media_info::MediaInfo, queue_list::QueueList, state_bar::StateBar, theme::Theme},
+    tui::{
+        media_info::MediaInfo, queue_list::QueueList, state::UiState, state_bar::StateBar,
+        theme::Theme,
+    },
 };
 
 pub mod media_info;
 pub mod queue_list;
+pub mod state;
 pub mod state_bar;
 pub mod theme;
 
@@ -69,6 +73,7 @@ pub struct AppState {
     playlist: Rc<RefCell<PlayList>>,
     volume: Rc<Cell<u8>>,
     theme: Rc<Theme>,
+    ui_state: Rc<RefCell<UiState>>,
 }
 
 impl AppState {
@@ -81,6 +86,7 @@ impl AppState {
             playlist: Rc::new(RefCell::new(PlayList::default())),
             volume: Rc::new(Cell::new(0)),
             theme: Rc::new(Theme::default()),
+            ui_state: Rc::new(RefCell::new(UiState::default())),
         }
     }
 }
@@ -146,6 +152,12 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
             }
             AppCommand::Rerender(force) => {
                 force_render = force;
+            }
+            AppCommand::MoveQueueCursor(steps) => {
+                let list_len = state.playlist.borrow().list.len();
+                if state.ui_state.borrow_mut().queue.r#move(steps, list_len) {
+                    force_render = true;
+                }
             }
         }
 
@@ -228,6 +240,18 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     ..
                 } => {
                     player_tx.send(PlayerCommand::PrevSong).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('n'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveQueueCursor(1)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('p'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveQueueCursor(-1)).ok();
                 }
                 _ => {}
             },

@@ -41,6 +41,8 @@ pub struct Theme {
     pub queue_title: Color,
     pub queue_album: Color,
     pub queue_year: Color,
+    pub queue_duration: Color,
+    pub queue_header: Color,
     pub queue_current_bg: Color,
 }
 
@@ -86,6 +88,8 @@ impl Theme {
             queue_title: Color::Rgb(192, 202, 245),
             queue_album: Color::Rgb(224, 175, 104),
             queue_year: Color::Rgb(86, 95, 137),
+            queue_duration: Color::Rgb(86, 95, 137),
+            queue_header: Color::Rgb(158, 206, 106),
             queue_current_bg: Color::Rgb(56, 62, 90),
         }
     }
@@ -131,6 +135,8 @@ impl Theme {
             queue_title: Color::Rgb(205, 214, 244),
             queue_album: Color::Rgb(249, 226, 175),
             queue_year: Color::Rgb(166, 173, 200),
+            queue_duration: Color::Rgb(166, 173, 200),
+            queue_header: Color::Rgb(148, 226, 213),
             queue_current_bg: Color::Rgb(88, 91, 112),
         }
     }
@@ -176,6 +182,8 @@ impl Theme {
             queue_title: Color::Rgb(202, 211, 245),
             queue_album: Color::Rgb(238, 212, 159),
             queue_year: Color::Rgb(165, 173, 203),
+            queue_duration: Color::Rgb(165, 173, 203),
+            queue_header: Color::Rgb(139, 213, 202),
             queue_current_bg: Color::Rgb(91, 96, 120),
         }
     }
@@ -221,6 +229,8 @@ impl Theme {
             queue_title: Color::Rgb(198, 208, 245),
             queue_album: Color::Rgb(229, 200, 144),
             queue_year: Color::Rgb(165, 173, 206),
+            queue_duration: Color::Rgb(165, 173, 206),
+            queue_header: Color::Rgb(129, 200, 190),
             queue_current_bg: Color::Rgb(98, 104, 128),
         }
     }
@@ -266,6 +276,8 @@ impl Theme {
             queue_title: Color::Rgb(76, 79, 105),
             queue_album: Color::Rgb(223, 142, 29),
             queue_year: Color::Rgb(108, 111, 133),
+            queue_duration: Color::Rgb(108, 111, 133),
+            queue_header: Color::Rgb(23, 146, 153),
             queue_current_bg: Color::Rgb(204, 208, 218),
         }
     }
