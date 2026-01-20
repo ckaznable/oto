@@ -4,7 +4,7 @@ use ratatui::{
     widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, StatefulWidget, Table, Widget},
 };
 
-use crate::tui::AppState;
+use crate::tui::{AppState, LAYOUT_WIDTH_S};
 
 pub struct QueueList;
 
@@ -26,6 +26,8 @@ impl StatefulWidget for QueueList {
         let cursor_index = state.ui_state.borrow().queue.cursor_index;
         let playing_index = state.ui_state.borrow().queue.playing_index;
 
+        let is_compact = area.width <= LAYOUT_WIDTH_S;
+
         let rows: Vec<Row> = playlist
             .list
             .iter()
@@ -40,7 +42,7 @@ impl StatefulWidget for QueueList {
                 let year = track
                     .album
                     .year
-                    .map(|y| format!("({})", y))
+                    .map(|y| format!("{y}"))
                     .unwrap_or_default();
 
                 let duration = format!(
@@ -67,13 +69,21 @@ impl StatefulWidget for QueueList {
 
                 let playing_indicator = String::from(if is_playing { "" } else { " " });
 
-                Row::new([
-                    Cell::from(playing_indicator).style(Style::default().fg(theme.mode_playing_fg)),
-                    Cell::from(title).style(title_style),
-                    Cell::from(album).style(album_style),
-                    Cell::from(year).style(year_style),
-                    Cell::from(duration).style(duration_style),
-                ])
+                if is_compact {
+                    Row::new([
+                        Cell::from(title).style(title_style),
+                        Cell::from(duration).style(duration_style),
+                    ])
+                } else {
+                    Row::new([
+                        Cell::from(playing_indicator)
+                            .style(Style::default().fg(theme.mode_playing_fg)),
+                        Cell::from(title).style(title_style),
+                        Cell::from(album).style(album_style),
+                        Cell::from(year).style(year_style),
+                        Cell::from(duration).style(duration_style),
+                    ])
+                }
                 .style(Style::default().bg(bg_color))
                 .height(1)
             })
@@ -85,26 +95,34 @@ impl StatefulWidget for QueueList {
         let [table_area, scrollbar_area] = layout.areas(area);
         let table_area = table_area.inner(Margin::new(1, 0));
 
-        let widths = [
-            Constraint::Length(2),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Length(6),
-            Constraint::Length(6),
-        ];
+        let widths = if is_compact {
+            vec![Constraint::Fill(1), Constraint::Length(6)]
+        } else {
+            vec![
+                Constraint::Length(2),
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+                Constraint::Length(6),
+                Constraint::Length(6),
+            ]
+        };
 
         let visible_height = table_area.height.saturating_sub(1) as usize; // Subtract 1 for header
         let offset = calculate_scroll_offset(cursor_index, visible_height, list_len);
 
         let visible_rows: Vec<Row> = rows.into_iter().skip(offset).take(visible_height).collect();
 
-        let header = Row::new([
-            Cell::from(""),
-            Cell::from("Title"),
-            Cell::from("Album"),
-            Cell::from("Year"),
-            Cell::from("Time"),
-        ])
+        let header = if is_compact {
+            Row::new([Cell::from("Title"), Cell::from("Time")])
+        } else {
+            Row::new([
+                Cell::from(""),
+                Cell::from("Title"),
+                Cell::from("Album"),
+                Cell::from("Year"),
+                Cell::from("Time"),
+            ])
+        }
         .style(
             Style::default()
                 .fg(theme.queue_header)

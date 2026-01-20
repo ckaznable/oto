@@ -36,6 +36,9 @@ pub mod state;
 pub mod state_bar;
 pub mod theme;
 
+pub const LAYOUT_WIDTH_S: u16 = 65;
+pub const LAYOUT_WIDTH_L: u16 = 120;
+
 #[derive(Clone, Copy, Default, Display)]
 pub enum AppMode {
     #[default]
@@ -193,9 +196,9 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     let [content, bottom] = layout.areas(area);
 
-    let layout = Layout::horizontal(if area.width > 120 {
+    let layout = Layout::horizontal(if area.width > LAYOUT_WIDTH_L {
         [Constraint::Length(50), Constraint::Fill(1)]
-    } else if area.width <= 65 {
+    } else if area.width <= LAYOUT_WIDTH_S {
         [Constraint::Fill(1), Constraint::Length(0)]
     } else {
         [Constraint::Length(30), Constraint::Fill(1)]
@@ -203,7 +206,7 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     let [media_info, queue] = layout.areas(content);
 
-    if area.width > 65 {
+    if area.width > LAYOUT_WIDTH_S {
         frame.render_stateful_widget(QueueList, queue, &mut state);
     }
 
