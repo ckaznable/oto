@@ -182,7 +182,7 @@ fn render(frame: &mut Frame, mut state: AppState) {
         frame.render_stateful_widget(QueueList, queue, &mut state);
     }
 
-    frame.render_stateful_widget(MediaInfo::default(), media_info, &mut state);
+    frame.render_stateful_widget(MediaInfo, media_info, &mut state);
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 

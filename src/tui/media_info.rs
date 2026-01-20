@@ -1,20 +1,12 @@
 use ratatui::{
     layout::Constraint,
     prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph, Widget},
+    widgets::{Block, Padding, Paragraph, Widget},
 };
 
 use crate::tui::AppState;
 
-pub struct MediaInfo {
-    pub border: bool,
-}
-
-impl Default for MediaInfo {
-    fn default() -> Self {
-        Self { border: true }
-    }
-}
+pub struct MediaInfo;
 
 impl StatefulWidget for MediaInfo {
     type State = AppState;
@@ -22,15 +14,9 @@ impl StatefulWidget for MediaInfo {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = &state.theme;
 
-        let block = if self.border {
-            Block::default()
-                .borders(Borders::RIGHT)
-                .border_type(BorderType::QuadrantInside)
-                .border_style(Style::default().fg(theme.mantle))
-                .style(Style::default().bg(theme.mantle))
-        } else {
-            Block::default().style(Style::default().bg(theme.mantle))
-        };
+        let block = Block::default()
+            .padding(Padding::uniform(1))
+            .style(Style::default().bg(theme.mantle));
 
         let inner = block.inner(area);
         block.render(area, buf);
