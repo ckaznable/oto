@@ -13,6 +13,7 @@ pub enum PlayerCommand {
     SetVolumn(u8),
     NextSong,
     PrevSong,
+    PlayTrackWithIndex(usize),
 }
 
 #[derive(Clone)]
@@ -27,6 +28,7 @@ pub enum AppCommand {
     PlaylistUpdate(PlayList),
     Rerender(bool),
     MoveQueueCursor(i16),
+    PickTrack,
 }
 
 #[derive(Clone)]

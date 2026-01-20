@@ -208,6 +208,15 @@ impl BufferPlayer {
         Ok(())
     }
 
+    pub fn play(&mut self, index: usize) -> Result<Option<TrackMeta>> {
+        if let Some(track) = self.playlist.play(index) {
+            self.open(&track.path)?;
+            return Ok(Some(track));
+        }
+
+        Err(anyhow!("can't play the track with index {}", index))
+    }
+
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<Option<TrackMeta>> {
         if let Some(track) = self.playlist.next() {
@@ -367,6 +376,12 @@ impl PlayList {
             list: Arc::new(list),
             index: 0,
         }
+    }
+
+    pub fn play(&mut self, index: usize) -> Option<TrackMeta> {
+        let track = self.list.get(index).cloned()?;
+        self.index = index;
+        Some(track)
     }
 
     #[allow(clippy::should_implement_trait)]

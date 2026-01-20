@@ -13,7 +13,7 @@ impl QueueState {
     }
 
     /// Move cursor by steps (positive = forward, negative = backward), returns true if cursor changed
-    pub fn r#move(&mut self, steps: i16, len: usize) -> bool {
+    pub fn move_cursor(&mut self, steps: i16, len: usize) -> bool {
         if len == 0 {
             return false;
         }

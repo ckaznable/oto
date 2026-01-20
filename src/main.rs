@@ -201,6 +201,18 @@ fn player_event_loop(
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
+                PlayerCommand::PlayTrackWithIndex(index) => {
+                    if let Ok(Some(track)) = player.play(index) {
+                        player.clear_buffer();
+                        output.drop().ok();
+                        output.prepare().ok();
+
+                        let spec = player.spec.unwrap_or_default();
+                        tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
+                        mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
+                    }
+                }
             }
         }
 

@@ -9,6 +9,7 @@ use std::{
 use strum::Display;
 
 use ratatui::{
+    DefaultTerminal, Frame,
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent},
@@ -17,7 +18,6 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     widgets::Block,
-    DefaultTerminal, Frame,
 };
 
 use crate::{
@@ -96,12 +96,16 @@ pub fn tui(
     tx: Sender<AppCommand>,
     rx: Receiver<AppCommand>,
 ) -> anyhow::Result<()> {
-    std::thread::spawn(enclose!((tx) move || handle_keypress(tx, player_tx)));
-    ratatui::run(move |t| app(t, rx))?;
+    std::thread::spawn(enclose!((tx, player_tx) move || handle_keypress(tx, player_tx)));
+    ratatui::run(move |t| app(t, rx, player_tx))?;
     Ok(())
 }
 
-fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Result<()> {
+fn app(
+    terminal: &mut DefaultTerminal,
+    rx: Receiver<AppCommand>,
+    player_tx: Sender<PlayerCommand>,
+) -> std::io::Result<()> {
     let state = AppState::new();
 
     let min_refresh_duration = Duration::from_secs_f64(1. / 30.);
@@ -155,9 +159,18 @@ fn app(terminal: &mut DefaultTerminal, rx: Receiver<AppCommand>) -> std::io::Res
             }
             AppCommand::MoveQueueCursor(steps) => {
                 let list_len = state.playlist.borrow().list.len();
-                if state.ui_state.borrow_mut().queue.r#move(steps, list_len) {
+                if state
+                    .ui_state
+                    .borrow_mut()
+                    .queue
+                    .move_cursor(steps, list_len)
+                {
                     force_render = true;
                 }
+            }
+            AppCommand::PickTrack => {
+                let index = state.ui_state.borrow().queue.cursor_index;
+                player_tx.send(PlayerCommand::PlayTrackWithIndex(index)).ok();
             }
         }
 
@@ -252,6 +265,12 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     ..
                 } => {
                     tx.send(AppCommand::MoveQueueCursor(-1)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Enter,
+                    ..
+                } => {
+                    tx.send(AppCommand::PickTrack).ok();
                 }
                 _ => {}
             },
