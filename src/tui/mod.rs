@@ -150,6 +150,10 @@ fn app(
                     execute!(stdout(), SetTitle(format!(" {title}"))).ok();
                 }
 
+                // if let Some(data) = track.cover() {
+                //     state.ui_state.borrow_mut().media_info.set_cover(&data).ok();
+                // }
+
                 *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 force_render = true;
             }

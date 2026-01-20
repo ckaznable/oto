@@ -44,6 +44,8 @@ impl StatefulWidget for MediaInfo {
         }
 
         let layout = Layout::vertical([
+            Constraint::Length(inner.width / 2),
+            Constraint::Length(1),
             Constraint::Length(title_height),
             Constraint::Length(1),
             Constraint::Length(artist_height),
@@ -54,19 +56,31 @@ impl StatefulWidget for MediaInfo {
 
         let areas = layout.split(inner);
 
+        // render cover
+        // {
+        //     use ratatui_image::StatefulImage;
+        //     if let Some(cover) = state.ui_state.borrow_mut().media_info.cover.as_mut() {
+        //         StatefulImage::default().render(areas[0], buf, cover);
+        //     }
+        // }
+
+        Block::default()
+            .style(ratatui::style::Style::default().bg(state.theme.surface1))
+            .render(areas[0], buf);
+
         Paragraph::new(title)
             .style(Style::default().fg(theme.media_title).bold())
             .alignment(Alignment::Center)
-            .render(areas[0], buf);
+            .render(areas[2], buf);
 
         Paragraph::new(format!("by {}", artist))
             .style(Style::default().fg(theme.media_artist))
             .alignment(Alignment::Center)
-            .render(areas[2], buf);
+            .render(areas[4], buf);
 
         Paragraph::new(album)
             .style(Style::default().fg(theme.media_album))
             .alignment(Alignment::Center)
-            .render(areas[4], buf);
+            .render(areas[6], buf);
     }
 }

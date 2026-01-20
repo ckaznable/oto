@@ -1,4 +1,9 @@
+use std::io::Cursor;
+
+use anyhow::Result;
+use image::ImageReader;
 use ratatui::widgets::ScrollbarState;
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 
 #[derive(Default)]
 pub struct QueueState {
@@ -60,7 +65,40 @@ impl QueueState {
     }
 }
 
+pub struct MediaInfoState {
+    pub picker: Option<Picker>,
+    pub cover: Option<StatefulProtocol>,
+}
+
+impl Default for MediaInfoState {
+    fn default() -> Self {
+        Self {
+            picker: Picker::from_query_stdio().ok(),
+            cover: None,
+        }
+    }
+}
+
+impl MediaInfoState {
+    pub fn set_cover(&mut self, data: &[u8]) -> Result<()> {
+        let img = ImageReader::new(Cursor::new(data))
+            .with_guessed_format()?
+            .decode()?
+            .into_rgb8();
+        let dyimg = image::DynamicImage::ImageRgb8(img);
+
+        let image = self.picker.as_ref().map(|p| p.new_resize_protocol(dyimg));
+        if let Some(mut cover) = self.cover.take() {
+            cover.last_encoding_result();
+        }
+
+        self.cover = image;
+        Ok(())
+    }
+}
+
 #[derive(Default)]
 pub struct UiState {
     pub queue: QueueState,
+    pub media_info: MediaInfoState,
 }
