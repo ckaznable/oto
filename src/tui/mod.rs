@@ -12,7 +12,7 @@ use ratatui::{
     DefaultTerminal, Frame,
     crossterm::{
         self,
-        event::{Event, KeyCode, KeyEvent},
+        event::{Event, KeyCode, KeyEvent, KeyModifiers},
         execute,
         terminal::SetTitle,
     },
@@ -173,7 +173,9 @@ fn app(
             }
             AppCommand::PickTrack => {
                 let index = state.ui_state.borrow().queue.cursor_index;
-                player_tx.send(PlayerCommand::PlayTrackWithIndex(index)).ok();
+                player_tx
+                    .send(PlayerCommand::PlayTrackWithIndex(index))
+                    .ok();
             }
         }
 
@@ -235,15 +237,29 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                 }
                 KeyEvent {
                     code: KeyCode::Char('j'),
+                    modifiers: KeyModifiers::CONTROL,
                     ..
                 } => {
                     player_tx.send(PlayerCommand::SetRelatedVolume(-5)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('k'),
+                    modifiers: KeyModifiers::CONTROL,
                     ..
                 } => {
                     player_tx.send(PlayerCommand::SetRelatedVolume(5)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('j'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveQueueCursor(1)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveQueueCursor(-1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('l'),
@@ -256,18 +272,6 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     ..
                 } => {
                     player_tx.send(PlayerCommand::PrevSong).ok();
-                }
-                KeyEvent {
-                    code: KeyCode::Char('n'),
-                    ..
-                } => {
-                    tx.send(AppCommand::MoveQueueCursor(1)).ok();
-                }
-                KeyEvent {
-                    code: KeyCode::Char('p'),
-                    ..
-                } => {
-                    tx.send(AppCommand::MoveQueueCursor(-1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Enter,
