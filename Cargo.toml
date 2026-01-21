@@ -14,7 +14,7 @@ id3 = "1.16.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp"] }
 log = "0.4.29"
 ratatui = { version = "0.30.0", default-features = false, features = ["crossterm", "layout-cache", "macros"] }
-ratatui-image = "10.0.2"
+ratatui-image = { git = "https://github.com/ckaznable/ratatui-image.git", rev = "9c5dda3993f85bbee9252d09ff924254a0f21445" }
 ringbuf = "0.4.8"
 simplelog = "0.12.2"
 symphonia = { version = "0.5.5", features = ["all-codecs", "opt-simd-sse", "opt-simd-avx"]}
@@ -28,6 +28,7 @@ tempfile = "3.24.0"
 gag = "1.0.0"
 os_pipe = "1.2.3"
 unicode-width = "0.2"
+mini-moka = "0.10"
 
 [profile.release]
 opt-level = 3

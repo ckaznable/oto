@@ -30,6 +30,7 @@ use crate::{
     },
 };
 
+pub mod image;
 pub mod media_info;
 pub mod queue_list;
 pub mod state;
