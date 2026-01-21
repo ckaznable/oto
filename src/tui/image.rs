@@ -1,16 +1,20 @@
 use anyhow::{Result, anyhow};
 use ratatui::{prelude::*, widgets::Block};
 use std::{
-    ops::{Deref, DerefMut}, path::PathBuf, sync::{
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    sync::{
         Arc,
         mpsc::{Receiver, Sender, channel},
-    }, thread::JoinHandle
+    },
+    thread::JoinHandle,
 };
 
 use mini_moka::sync::Cache;
 use ratatui_image::{
     picker::Picker,
-    protocol::Protocol, thread::{ResizeRequest, ResizeResponse},
+    protocol::Protocol,
+    thread::{ResizeRequest, ResizeResponse},
 };
 
 // 5mb cache
@@ -167,7 +171,10 @@ pub struct LruProtocol {
 
 impl LruProtocol {
     fn try_fill_from_cache(&mut self) {
-        if matches!(self.status, LruProtocolStatus::Ready|LruProtocolStatus::Err) {
+        if matches!(
+            self.status,
+            LruProtocolStatus::Ready | LruProtocolStatus::Err
+        ) {
             return;
         }
 
