@@ -14,7 +14,7 @@ id3 = "1.16.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp"] }
 log = "0.4.29"
 ratatui = { version = "0.30.0", default-features = false, features = ["crossterm", "layout-cache", "macros"] }
-ratatui-image = { git = "https://github.com/ckaznable/ratatui-image.git", rev = "9c5dda3993f85bbee9252d09ff924254a0f21445" }
+ratatui-image = { git = "https://github.com/ckaznable/ratatui-image.git", rev = "673e0575cfcf140ab7f96fc1976e1b761f494c3d" }
 ringbuf = "0.4.8"
 simplelog = "0.12.2"
 symphonia = { version = "0.5.5", features = ["all-codecs", "opt-simd-sse", "opt-simd-avx"]}
