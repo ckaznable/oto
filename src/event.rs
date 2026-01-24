@@ -1,7 +1,7 @@
 use crate::{
     media::{MediaSpec, TrackMeta},
     player::PlayList,
-    tui::AppMode,
+    tui::{AppMode, image::ProtocolLruResult},
 };
 
 #[derive(Clone)]
@@ -16,7 +16,6 @@ pub enum PlayerCommand {
     PlayTrackWithIndex(usize),
 }
 
-#[derive(Clone)]
 pub enum AppCommand {
     Err(&'static str),
     Unexcepted(String),
@@ -29,6 +28,7 @@ pub enum AppCommand {
     Rerender(bool),
     MoveQueueCursor(i16),
     PickTrack,
+    ImageEncodeResult(ProtocolLruResult),
 }
 
 #[derive(Clone)]

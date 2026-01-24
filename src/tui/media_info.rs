@@ -56,17 +56,16 @@ impl StatefulWidget for MediaInfo {
 
         let areas = layout.split(inner);
 
-        // render cover
-        // {
-        //     use ratatui_image::StatefulImage;
-        //     if let Some(cover) = state.ui_state.borrow_mut().media_info.cover.as_mut() {
-        //         StatefulImage::default().render(areas[0], buf, cover);
-        //     }
-        // }
+        {
+            use ratatui_image::StatefulImage;
+            if let Some(cover) = state.ui_state.borrow_mut().cover.as_mut() {
+                StatefulImage::new().render(areas[0], buf, cover);
+            }
+        }
 
-        Block::default()
-            .style(ratatui::style::Style::default().bg(state.theme.surface1))
-            .render(areas[0], buf);
+        // Block::default()
+        //     .style(ratatui::style::Style::default().bg(state.theme.surface1))
+        //     .render(areas[0], buf);
 
         Paragraph::new(title)
             .style(Style::default().fg(theme.media_title).bold())

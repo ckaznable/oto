@@ -1,4 +1,6 @@
+use anyhow::anyhow;
 use enclose::enclose;
+use ratatui_image::picker::Picker;
 use std::{
     cell::{Cell, RefCell},
     io::stdout,
@@ -25,8 +27,8 @@ use crate::{
     media::{MediaSpec, TrackMeta},
     player::PlayList,
     tui::{
-        media_info::MediaInfo, queue_list::QueueList, state::UiState, state_bar::StateBar,
-        theme::Theme,
+        image::LruProtocolFactory, media_info::MediaInfo, queue_list::QueueList, state::UiState,
+        state_bar::StateBar, theme::Theme,
     },
 };
 
@@ -100,17 +102,36 @@ pub fn tui(
     tx: Sender<AppCommand>,
     rx: Receiver<AppCommand>,
 ) -> anyhow::Result<()> {
+    let picker = match Picker::from_query_stdio() {
+        Ok(p) => p,
+        Err(e) => {
+            log::error!("{e:?}");
+            return Err(anyhow!("{e:?}"));
+        }
+    };
+
+    log::info!("image protocol {picker:?}");
+
     std::thread::spawn(enclose!((tx, player_tx) move || handle_keypress(tx, player_tx)));
-    ratatui::run(move |t| app(t, rx, player_tx))?;
+    ratatui::run(move |t| app(t, tx, rx, player_tx, picker))?;
     Ok(())
 }
 
 fn app(
     terminal: &mut DefaultTerminal,
+    tx: Sender<AppCommand>,
     rx: Receiver<AppCommand>,
     player_tx: Sender<PlayerCommand>,
-) -> std::io::Result<()> {
+    picker: Picker,
+) -> anyhow::Result<()> {
     let state = AppState::new();
+
+    let mut lru_protocol_factory = LruProtocolFactory::new()?;
+    lru_protocol_factory.on_cached(move |result| {
+        log::info!("got image encode result");
+        tx.send(AppCommand::ImageEncodeResult(result)).ok();
+    });
+    lru_protocol_factory.spawn(picker)?;
 
     let min_refresh_duration = Duration::from_secs_f64(1. / 30.);
     let mut timer = Instant::now();
@@ -151,9 +172,9 @@ fn app(
                     execute!(stdout(), SetTitle(format!(" {title}"))).ok();
                 }
 
-                // if let Some(data) = track.cover() {
-                //     state.ui_state.borrow_mut().media_info.set_cover(&data).ok();
-                // }
+                let mut ui_state = state.ui_state.borrow_mut();
+                let protocol = lru_protocol_factory.new_uncached_protocol(track.path.clone());
+                ui_state.cover.replace(protocol);
 
                 *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
                 force_render = true;
@@ -182,6 +203,17 @@ fn app(
                     .send(PlayerCommand::PlayTrackWithIndex(index))
                     .ok();
             }
+            AppCommand::ImageEncodeResult(result) => match result {
+                image::ProtocolLruResult::Cached(_) => todo!(),
+                image::ProtocolLruResult::UnCached(_, stateful_protocol) => {
+                    let _ = state
+                        .ui_state
+                        .borrow_mut()
+                        .cover
+                        .as_mut()
+                        .map(|p| p.update_resized_protocol(stateful_protocol));
+                }
+            },
         }
 
         if force_render || timer.elapsed() >= min_refresh_duration {

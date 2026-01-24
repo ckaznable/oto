@@ -5,6 +5,8 @@ use image::ImageReader;
 use ratatui::widgets::ScrollbarState;
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 
+use crate::tui::image::UnCachedProtocol;
+
 #[derive(Default)]
 pub struct QueueState {
     pub cursor_index: usize,
@@ -101,4 +103,5 @@ impl MediaInfoState {
 pub struct UiState {
     pub queue: QueueState,
     pub media_info: MediaInfoState,
+    pub cover: Option<UnCachedProtocol>,
 }

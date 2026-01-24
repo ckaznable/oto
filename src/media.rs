@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use lofty::{config::ParseOptions, file::TaggedFileExt, probe::Probe};
 
@@ -44,22 +44,15 @@ impl TrackMeta {
         }
     }
 
-    pub fn cover_dsf(&self) -> Option<Vec<u8>> {
-        let mut file = std::fs::File::open(&self.path).ok()?;
-        let reader = DsfReader::new(&mut file);
-        let metadata = reader.parse().ok()?;
-        metadata.tag?.pictures().next().map(|p| p.data.clone())
-    }
-
-    pub fn cover(&self) -> Option<Vec<u8>> {
-        if let Some(ext) = self.path.extension()
+    pub fn cover_from_path(path: &Path) -> Option<Vec<u8>> {
+        if let Some(ext) = path.extension()
             && ext == "dsf"
         {
-            return self.cover_dsf();
+            return Self::cover_dsf(path);
         }
 
-        let options = ParseOptions::new().read_properties(false).read_tags(false);
-        let tagged_file = Probe::open(&self.path).ok()?.options(options).read().ok()?;
+        let options = ParseOptions::new().read_properties(false);
+        let tagged_file = Probe::open(path).ok()?.options(options).read().ok()?;
         let tag = tagged_file
             .primary_tag()
             .or_else(|| tagged_file.first_tag())?;
@@ -67,6 +60,17 @@ impl TrackMeta {
         tag.pictures()
             .first()
             .map(|pic| pic.data().to_vec())
-            .or_else(|| Some(get_cover_with_root_path(&self.path)?.1))
+            .or_else(|| Some(get_cover_with_root_path(path)?.1))
+    }
+
+    pub fn cover_dsf(path: &Path) -> Option<Vec<u8>> {
+        let mut file = std::fs::File::open(path).ok()?;
+        let reader = DsfReader::new(&mut file);
+        let metadata = reader.parse().ok()?;
+        metadata.tag?.pictures().next().map(|p| p.data.clone())
+    }
+
+    pub fn cover(&self) -> Option<Vec<u8>> {
+        Self::cover_from_path(&self.path)
     }
 }

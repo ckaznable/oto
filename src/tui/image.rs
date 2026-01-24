@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use ratatui::{prelude::*, widgets::Block};
 use std::{
+    io::Cursor,
     ops::{Deref, DerefMut},
     path::PathBuf,
     sync::{
@@ -15,8 +16,9 @@ use ratatui_image::{
     Resize, ResizeEncodeRender,
     picker::Picker,
     protocol::{Protocol, StatefulProtocol},
-    thread::ResizeResponse,
 };
+
+use crate::media::TrackMeta;
 
 // 5mb cache
 const LRU_MAX_CAP: u64 = 1024 * 1024 * 5;
@@ -93,21 +95,26 @@ impl ProtocolLruData {
                 path,
             } => {
                 let Some(mut protocol) = protocol.or_else(|| {
-                    let dyn_img = image::ImageReader::open(path)
-                        .ok()?
-                        .decode()
-                        .ok()?
-                        .to_rgb8();
-                    Some(picker.new_resize_protocol(image::DynamicImage::ImageRgb8(dyn_img)))
+                    log::info!("encode {path:?} to terminal protocol");
+
+                    let bytes = TrackMeta::cover_from_path(&path)?;
+                    log::info!("get {} image bytes from {path:?}", bytes.len());
+
+                    let dyn_img =
+                        image::ImageReader::new(Cursor::new(&bytes))
+                            .with_guessed_format()
+                            .ok()?
+                            .decode()
+                            .ok()?;
+                    Some(picker.new_resize_protocol(dyn_img))
                 }) else {
                     return Err(anyhow!("get resize protocol failed"));
                 };
 
+                protocol.last_encoding_result();
                 protocol.resize_encode(&resize, area);
-                protocol
-                    .last_encoding_result()
-                    .expect("The resize has just been performed")?;
 
+                log::info!("resize encode done");
                 Ok(ProtocolLruResult::UnCached(image, protocol))
             }
         }
@@ -131,12 +138,11 @@ impl<F> LruProtocolFactory<F>
 where
     F: Fn(ProtocolLruResult) + Send + 'static,
 {
-    pub fn spawn(&mut self) -> Result<()> {
+    pub fn spawn(&mut self, picker: Picker) -> Result<()> {
         if self.handle.is_some() {
             return Err(anyhow!("thread already spawned"));
         }
 
-        let picker = Picker::from_query_stdio()?;
         let rx = self.rx.take().unwrap();
         let on_cached = self.on_cached.take();
         let handle = std::thread::spawn(move || {
@@ -145,10 +151,11 @@ where
                     Err(_) => break Ok(()),
                     Ok(req) => {
                         let result = req.encode(&picker);
-                        if let Some(ref f) = on_cached
-                            && let Ok(result) = result
-                        {
-                            f(result);
+                        if let Some(ref f) = on_cached {
+                            match result {
+                                Ok(result) => f(result),
+                                Err(e) => log::error!("{e:?}"),
+                            }
                         }
                     }
                 }
@@ -184,6 +191,15 @@ impl<F> LruProtocolFactory<F> {
             status: LruProtocolStatus::Init,
             inner: None,
             cache: self.cache.clone(),
+        }
+    }
+
+    pub fn new_uncached_protocol(&self, path: PathBuf) -> UnCachedProtocol {
+        UnCachedProtocol {
+            inner: None,
+            tx: self.tx.clone(),
+            path,
+            loading: false,
         }
     }
 }
@@ -232,16 +248,21 @@ pub struct UnCachedProtocol {
     inner: Option<StatefulProtocol>,
     tx: Sender<ProtocolLruData>,
     path: PathBuf,
+    loading: bool,
 }
 
 impl UnCachedProtocol {
-    pub fn update_resized_protocol(&mut self, completed: ResizeResponse) {
-        self.inner = Some(completed.protocol)
+    pub fn update_resized_protocol(&mut self, completed: StatefulProtocol) {
+        self.inner.replace(completed);
     }
 }
 
 impl ResizeEncodeRender for UnCachedProtocol {
     fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect> {
+        if !self.loading {
+            return Some(area);
+        }
+
         self.inner
             .as_ref()
             .and_then(|protocol| protocol.needs_resize(resize, area))
@@ -257,6 +278,8 @@ impl ResizeEncodeRender for UnCachedProtocol {
                 path: self.path.clone(),
             })
             .ok();
+
+        self.loading = true;
     }
 
     fn render(&mut self, area: Rect, buf: &mut Buffer) {
