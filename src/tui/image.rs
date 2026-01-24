@@ -1,5 +1,7 @@
 use anyhow::{Result, anyhow};
+use image::Limits;
 use ratatui::{prelude::*, widgets::Block};
+use rayon::iter::FilterMap;
 use std::{
     io::Cursor,
     ops::{Deref, DerefMut},
@@ -100,12 +102,13 @@ impl ProtocolLruData {
                     let bytes = TrackMeta::cover_from_path(&path)?;
                     log::info!("get {} image bytes from {path:?}", bytes.len());
 
-                    let dyn_img =
-                        image::ImageReader::new(Cursor::new(&bytes))
-                            .with_guessed_format()
-                            .ok()?
-                            .decode()
-                            .ok()?;
+                    let dyn_img = image::ImageReader::new(Cursor::new(&bytes))
+                        .with_guessed_format()
+                        .ok()?
+                        .decode()
+                        .ok()?
+                        .resize(450, 450, image::imageops::FilterType::CatmullRom);
+
                     Some(picker.new_resize_protocol(dyn_img))
                 }) else {
                     return Err(anyhow!("get resize protocol failed"));

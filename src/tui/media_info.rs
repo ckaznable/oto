@@ -63,10 +63,6 @@ impl StatefulWidget for MediaInfo {
             }
         }
 
-        // Block::default()
-        //     .style(ratatui::style::Style::default().bg(state.theme.surface1))
-        //     .render(areas[0], buf);
-
         Paragraph::new(title)
             .style(Style::default().fg(theme.media_title).bold())
             .alignment(Alignment::Center)
