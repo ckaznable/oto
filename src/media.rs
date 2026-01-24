@@ -1,26 +1,41 @@
-use std::path::{Path, PathBuf};
+use anyhow::Result;
+use id3::TagLike;
+use lofty::{
+    config::ParseOptions,
+    file::{AudioFile, TaggedFileExt},
+    probe::Probe,
+    tag::Accessor,
+};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::{Path, PathBuf},
+};
+use walkdir::WalkDir;
 
-use lofty::{config::ParseOptions, file::TaggedFileExt, probe::Probe};
-use serde::{Deserialize, Serialize};
+use bitcode::{Decode, Encode};
 
-use crate::{decoder::DsfReader, util::{cover_from_path, get_cover_with_root_path}};
+use crate::{decoder::DsfReader, shared::PROJ_DIRS, util::cover_from_path};
+
+pub type Tracks = Vec<TrackMeta>;
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Encode, Decode)]
 pub enum OutputMode {
     #[default]
     PCM,
     DSD,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Encode, Decode)]
 pub struct Album {
     pub name: Option<String>,
     pub year: Option<u32>,
     pub track: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default, Encode, Decode)]
 pub struct MediaSpec {
     pub sample_rate: u32,
     pub duration: Option<u64>,
@@ -28,9 +43,9 @@ pub struct MediaSpec {
     pub mode: OutputMode,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Encode, Decode)]
 pub struct TrackMeta {
-    pub path: PathBuf,
+    pub path: String,
     pub title: Option<String>,
     pub artist: Option<String>,
     pub album: Album,
@@ -38,7 +53,11 @@ pub struct TrackMeta {
 }
 
 impl TrackMeta {
-    pub fn empty(path: PathBuf) -> Self {
+    pub fn path(&self) -> PathBuf {
+        self.path.clone().into()
+    }
+
+    pub fn empty(path: String) -> Self {
         Self {
             path,
             ..Default::default()
@@ -46,6 +65,147 @@ impl TrackMeta {
     }
 
     pub fn cover(&self) -> Option<Vec<u8>> {
-        cover_from_path(&self.path)
+        cover_from_path(&self.path())
+    }
+}
+
+pub struct MediaStore;
+
+impl MediaStore {
+    pub fn get_tracks(path: Option<&Path>) -> Tracks {
+        match path {
+            Some(p) => {
+                let mut list = vec![];
+                if !p.exists() {
+                    return list;
+                }
+
+                if p.is_file()
+                    && let Some(track) = Self::parse_one_file(p)
+                {
+                    list.push(track);
+                } else {
+                    list = Self::scan_tracks(p);
+                }
+
+                Self::save_tracks(&list).ok();
+                list
+            }
+            None => {
+                Self::load_tracks().ok().unwrap_or_default()
+            }
+        }
+    }
+
+    pub fn tracks_file_path() -> PathBuf {
+        PROJ_DIRS.data_dir().join("tracks")
+    }
+
+    pub fn save_tracks(tracks: &Tracks) -> Result<()> {
+        let path = Self::tracks_file_path();
+        std::fs::create_dir_all(path.parent().unwrap())?;
+
+        let raw_bytes = bitcode::encode(tracks);
+
+        let file = File::create(path)?;
+        let mut encoder = zstd::stream::Encoder::new(file, 3)?;
+        encoder.write_all(&raw_bytes)?;
+        encoder.finish()?;
+        Ok(())
+    }
+
+    pub fn load_tracks() -> Result<Tracks> {
+        let path = Self::tracks_file_path();
+        let file = File::open(path)?;
+        let mut decoder = zstd::stream::Decoder::new(file)?;
+        let mut buffer = Vec::new();
+        decoder.read_to_end(&mut buffer)?;
+
+        let tracks: Tracks = bitcode::decode(&buffer)?;
+        Ok(tracks)
+    }
+
+    pub fn scan_tracks(root_path: &Path) -> Vec<TrackMeta> {
+        let files: Vec<_> = WalkDir::new(root_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.path().extension().is_some_and(|ext| {
+                    ext == "flac"
+                        || ext == "dsf"
+                        || ext == "acc"
+                        || ext == "mp3"
+                        || ext == "ogg"
+                        || ext == "wav"
+                })
+            })
+            .collect();
+
+        log::info!("found media files: {}", files.len());
+
+        let tracks: Vec<TrackMeta> = files
+            .par_iter()
+            .map(|entry| {
+                let path = entry.path();
+                Self::parse_one_file(path)
+            })
+            .flatten()
+            .collect();
+
+        log::info!("found tracks: {}", tracks.len());
+
+        tracks
+    }
+
+    pub fn parse_dsf_file(path: &Path) -> Option<TrackMeta> {
+        let mut file = std::fs::File::open(path).ok()?;
+        let reader = DsfReader::new(&mut file);
+        let metadata = reader.parse().ok()?;
+        let duration_secs =
+            (metadata.sample_count / metadata.channel_num as u64) / metadata.sample_freq as u64;
+        let tag = metadata.tag?;
+
+        let track = TrackMeta {
+            path: path.to_string_lossy().to_string(),
+            title: tag.title().map(|a| a.to_string()),
+            artist: tag.artist().map(|a| a.to_string()),
+            album: Album {
+                name: tag.album().map(|a| a.to_string()),
+                year: tag.year().map(|a| a as u32),
+                track: tag.track(),
+            },
+            duration_secs,
+        };
+
+        Some(track)
+    }
+
+    pub fn parse_one_file(path: &Path) -> Option<TrackMeta> {
+        if let Some(ext) = path.extension()
+            && ext == "dsf"
+        {
+            return Self::parse_dsf_file(path);
+        }
+
+        let options = ParseOptions::new().read_cover_art(false);
+        let tagged_file = Probe::open(path).ok()?.options(options).read().ok()?;
+
+        let tag = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag())?;
+
+        let properties = tagged_file.properties();
+
+        Some(TrackMeta {
+            path: path.to_string_lossy().to_string(),
+            title: tag.title().map(|t| t.to_string()),
+            artist: tag.artist().map(|a| a.to_string()),
+            album: Album {
+                name: tag.album().map(|a| a.to_string()),
+                year: tag.year(),
+                track: tag.track(),
+            },
+            duration_secs: properties.duration().as_secs(),
+        })
     }
 }

@@ -53,4 +53,3 @@ pub fn cover_dsf(path: &Path) -> Option<Vec<u8>> {
     let metadata = reader.parse().ok()?;
     metadata.tag?.pictures().next().map(|p| p.data.clone())
 }
-

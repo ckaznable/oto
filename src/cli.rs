@@ -13,7 +13,7 @@ pub struct Args {
 pub enum Commands {
     Play {
         #[arg(short, long)]
-        path: PathBuf,
+        path: Option<PathBuf>,
 
         #[arg(short, long)]
         device: String,
@@ -21,7 +21,7 @@ pub enum Commands {
 
     Tui {
         #[arg(short, long)]
-        path: PathBuf,
+        path: Option<PathBuf>,
 
         #[arg(short, long)]
         device: String,

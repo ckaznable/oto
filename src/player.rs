@@ -29,7 +29,7 @@ use walkdir::WalkDir;
 
 use crate::{
     decoder::{Decoder, DecoderError, DsfReader, MixDecoder},
-    media::{Album, MediaSpec, OutputMode, TrackMeta},
+    media::{Album, MediaSpec, MediaStore, OutputMode, TrackMeta, Tracks},
     shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
 
@@ -165,7 +165,7 @@ pub struct BufferPlayer {
 }
 
 impl BufferPlayer {
-    pub fn new(p: impl Into<PathBuf>) -> Result<Self> {
+    pub fn new(p: Option<PathBuf>) -> Result<Self> {
         let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
         let buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
 
@@ -351,29 +351,14 @@ impl BufferPlayer {
 
 #[derive(Clone, Default)]
 pub struct PlayList {
-    pub list: Arc<Vec<TrackMeta>>,
+    pub list: Arc<Tracks>,
     pub index: usize,
 }
 
 impl PlayList {
-    pub fn new(p: impl Into<PathBuf>) -> Self {
-        let p = p.into();
-        let mut list = vec![];
-
-        if !p.exists() {
-            return Self::default();
-        }
-
-        if p.is_file()
-            && let Some(track) = parse_one_file(&p)
-        {
-            list.push(track);
-        } else {
-            list = scan_music_library(&p);
-        }
-
+    pub fn new(p: Option<PathBuf>) -> Self {
         Self {
-            list: Arc::new(list),
+            list: Arc::new(MediaStore::get_tracks(p.as_deref())),
             index: 0,
         }
     }
@@ -411,86 +396,3 @@ impl PlayList {
     }
 }
 
-pub fn scan_music_library(root_path: &Path) -> Vec<TrackMeta> {
-    let files: Vec<_> = WalkDir::new(root_path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path().extension().is_some_and(|ext| {
-                ext == "flac"
-                    || ext == "dsf"
-                    || ext == "acc"
-                    || ext == "mp3"
-                    || ext == "ogg"
-                    || ext == "wav"
-            })
-        })
-        .collect();
-
-    log::info!("found media files: {}", files.len());
-
-    let tracks: Vec<TrackMeta> = files
-        .par_iter()
-        .map(|entry| {
-            let path = entry.path();
-            parse_one_file(path)
-        })
-        .flatten()
-        .collect();
-
-    log::info!("found tracks: {}", tracks.len());
-
-    tracks
-}
-
-pub fn parse_dsf_file(path: &Path) -> Option<TrackMeta> {
-    let mut file = std::fs::File::open(path).ok()?;
-    let reader = DsfReader::new(&mut file);
-    let metadata = reader.parse().ok()?;
-    let duration_secs =
-        (metadata.sample_count / metadata.channel_num as u64) / metadata.sample_freq as u64;
-    let tag = metadata.tag?;
-
-    let track = TrackMeta {
-        path: path.to_owned(),
-        title: tag.title().map(|a| a.to_string()),
-        artist: tag.artist().map(|a| a.to_string()),
-        album: Album {
-            name: tag.album().map(|a| a.to_string()),
-            year: tag.year().map(|a| a as u32),
-            track: tag.track(),
-        },
-        duration_secs,
-    };
-
-    Some(track)
-}
-
-pub fn parse_one_file(path: &Path) -> Option<TrackMeta> {
-    if let Some(ext) = path.extension()
-        && ext == "dsf"
-    {
-        return parse_dsf_file(path);
-    }
-
-    let options = ParseOptions::new().read_cover_art(false);
-    let tagged_file = Probe::open(path).ok()?.options(options).read().ok()?;
-
-    let tag = tagged_file
-        .primary_tag()
-        .or_else(|| tagged_file.first_tag())?;
-
-    let properties = tagged_file.properties();
-
-    Some(TrackMeta {
-        path: path.to_owned(),
-        title: tag.title().map(|t| t.to_string()),
-        artist: tag.artist().map(|a| a.to_string()),
-        album: Album {
-            name: tag.album().map(|a| a.to_string()),
-            year: tag.year(),
-            track: tag.track(),
-        },
-        duration_secs: properties.duration().as_secs(),
-    })
-}

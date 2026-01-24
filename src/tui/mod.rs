@@ -173,7 +173,7 @@ fn app(
                 }
 
                 let mut ui_state = state.ui_state.borrow_mut();
-                let protocol = lru_protocol_factory.new_uncached_protocol(track.path.clone());
+                let protocol = lru_protocol_factory.new_uncached_protocol(track.path());
                 ui_state.cover.replace(protocol);
 
                 *state.playing_track.borrow_mut() = PlayingTrack { track, spec };

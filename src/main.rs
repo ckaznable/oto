@@ -90,7 +90,7 @@ fn redirect_stderr_to_log() -> Redirect<PipeWriter> {
 }
 
 fn player_event_loop(
-    path: impl Into<PathBuf>,
+    path: Option<PathBuf>,
     device: String,
     tx: Sender<AppCommand>,
     mtx: Sender<MprisCommand>,

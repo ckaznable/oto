@@ -29,8 +29,8 @@ gag = "1.0.0"
 os_pipe = "1.2.3"
 unicode-width = "0.2"
 mini-moka = "0.10"
-serde = { version = "1.0", features = ["derive"] }
-zstd = { version = "0.13.3", features = ["fat-lto"] }
+bitcode = "0.6.9"
+zstd = "0.13.3"
 
 [profile.release]
 opt-level = 3
