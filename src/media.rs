@@ -1,25 +1,26 @@
 use std::path::{Path, PathBuf};
 
 use lofty::{config::ParseOptions, file::TaggedFileExt, probe::Probe};
+use serde::{Deserialize, Serialize};
 
-use crate::{decoder::DsfReader, util::get_cover_with_root_path};
+use crate::{decoder::DsfReader, util::{cover_from_path, get_cover_with_root_path}};
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub enum OutputMode {
     #[default]
     PCM,
     DSD,
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Album {
     pub name: Option<String>,
     pub year: Option<u32>,
     pub track: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct MediaSpec {
     pub sample_rate: u32,
     pub duration: Option<u64>,
@@ -27,7 +28,7 @@ pub struct MediaSpec {
     pub mode: OutputMode,
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct TrackMeta {
     pub path: PathBuf,
     pub title: Option<String>,
@@ -44,33 +45,7 @@ impl TrackMeta {
         }
     }
 
-    pub fn cover_from_path(path: &Path) -> Option<Vec<u8>> {
-        if let Some(ext) = path.extension()
-            && ext == "dsf"
-        {
-            return Self::cover_dsf(path);
-        }
-
-        let options = ParseOptions::new().read_properties(false);
-        let tagged_file = Probe::open(path).ok()?.options(options).read().ok()?;
-        let tag = tagged_file
-            .primary_tag()
-            .or_else(|| tagged_file.first_tag())?;
-
-        tag.pictures()
-            .first()
-            .map(|pic| pic.data().to_vec())
-            .or_else(|| Some(get_cover_with_root_path(path)?.1))
-    }
-
-    pub fn cover_dsf(path: &Path) -> Option<Vec<u8>> {
-        let mut file = std::fs::File::open(path).ok()?;
-        let reader = DsfReader::new(&mut file);
-        let metadata = reader.parse().ok()?;
-        metadata.tag?.pictures().next().map(|p| p.data.clone())
-    }
-
     pub fn cover(&self) -> Option<Vec<u8>> {
-        Self::cover_from_path(&self.path)
+        cover_from_path(&self.path)
     }
 }

@@ -1,7 +1,5 @@
 use anyhow::{Result, anyhow};
-use image::Limits;
 use ratatui::{prelude::*, widgets::Block};
-use rayon::iter::FilterMap;
 use std::{
     io::Cursor,
     ops::{Deref, DerefMut},
@@ -20,7 +18,7 @@ use ratatui_image::{
     protocol::{Protocol, StatefulProtocol},
 };
 
-use crate::media::TrackMeta;
+use crate::util::cover_from_path;
 
 // 5mb cache
 const LRU_MAX_CAP: u64 = 1024 * 1024 * 5;
@@ -99,7 +97,7 @@ impl ProtocolLruData {
                 let Some(mut protocol) = protocol.or_else(|| {
                     log::info!("encode {path:?} to terminal protocol");
 
-                    let bytes = TrackMeta::cover_from_path(&path)?;
+                    let bytes = cover_from_path(&path)?;
                     log::info!("get {} image bytes from {path:?}", bytes.len());
 
                     let dyn_img = image::ImageReader::new(Cursor::new(&bytes))
