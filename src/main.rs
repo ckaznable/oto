@@ -185,7 +185,8 @@ fn player_event_loop(
 
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
-                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                            .ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
@@ -197,7 +198,8 @@ fn player_event_loop(
 
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
-                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                            .ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
@@ -209,7 +211,8 @@ fn player_event_loop(
 
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
-                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                            .ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
                 }
@@ -246,12 +249,21 @@ fn player_event_loop(
         match player.pop_state() {
             Some(LastPlayerState::PlayListChanged) => {
                 if let Some(track) = player.current() {
-                    tx.send(AppCommand::TrackUpdate(track.clone(), player.spec.unwrap_or_default())).ok();
-                    tx.send(AppCommand::PlaylistUpdate(player.playlist.clone())).ok();
-                    mtx.send(MprisCommand::TrackUpdate(track, player.spec.unwrap_or_default())).ok();
+                    tx.send(AppCommand::TrackUpdate(
+                        track.clone(),
+                        player.spec.unwrap_or_default(),
+                    ))
+                    .ok();
+                    tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                        .ok();
+                    mtx.send(MprisCommand::TrackUpdate(
+                        track,
+                        player.spec.unwrap_or_default(),
+                    ))
+                    .ok();
                 }
-            },
-            None => {},
+            }
+            None => {}
         }
 
         if !matches!(output.state(), State::Running | State::Paused) {

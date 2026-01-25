@@ -39,11 +39,7 @@ impl StatefulWidget for QueueList {
                     .name
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
-                let year = track
-                    .album
-                    .year
-                    .map(|y| format!("{y}"))
-                    .unwrap_or_default();
+                let year = track.album.year.map(|y| format!("{y}")).unwrap_or_default();
 
                 let duration = format!(
                     "{:02}:{:02}",

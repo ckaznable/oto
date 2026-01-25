@@ -91,9 +91,7 @@ impl MediaStore {
                 Self::save_tracks(&list).ok();
                 list
             }
-            None => {
-                Self::load_tracks().ok().unwrap_or_default()
-            }
+            None => Self::load_tracks().ok().unwrap_or_default(),
         }
     }
 

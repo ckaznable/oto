@@ -395,4 +395,3 @@ impl PlayList {
         self.list.len() == self.index.saturating_sub(1)
     }
 }
-
