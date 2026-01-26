@@ -1,9 +1,4 @@
-use std::{
-    collections::VecDeque,
-    ops::Deref,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::VecDeque, ops::Deref, path::PathBuf, sync::Arc};
 
 use anyhow::{Result, anyhow};
 
@@ -12,24 +7,15 @@ use alsa::{
     pcm::{HwParams, State},
 };
 use bytemuck::cast_slice;
-use id3::TagLike;
-use lofty::{
-    config::ParseOptions,
-    file::{AudioFile, TaggedFileExt},
-    probe::Probe,
-    tag::Accessor,
-};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ringbuf::{
     LocalRb,
     storage::Heap,
     traits::{Consumer, Observer, Producer},
 };
-use walkdir::WalkDir;
 
 use crate::{
-    decoder::{Decoder, DecoderError, DsfReader, MixDecoder},
-    media::{Album, MediaSpec, MediaStore, OutputMode, TrackMeta, Tracks},
+    decoder::{Decoder, DecoderError, MixDecoder},
+    media::{MediaSpec, MediaStore, OutputMode, TrackMeta, Tracks},
     shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
 
