@@ -106,18 +106,13 @@ impl SegmentData {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct TriangleSegmentGroup {
-    segments: Vec<SegmentData>,
+#[derive(Debug, Clone)]
+pub struct TriangleSegmentGroup<T> {
+    segments: T,
 }
 
-impl TriangleSegmentGroup {
-    pub fn add_segment(mut self, content: String, fg: Color, bg: Color) -> Self {
-        self.segments.push(SegmentData::new(content, fg, bg));
-        self
-    }
-
-    pub fn from_segments(segments: Vec<SegmentData>) -> Self {
+impl TriangleSegmentGroup<[SegmentData; 5]> {
+    pub fn new(segments: [SegmentData; 5]) -> Self {
         Self { segments }
     }
 
@@ -210,12 +205,13 @@ impl StatefulWidget for StateBar {
             theme.progress_inactive_bg
         };
 
-        let group = TriangleSegmentGroup::default()
-            .add_segment(app_mode_formatted, mode_color.0, mode_color.1)
-            .add_segment(sample_rate_str, sample_rate_color, theme.sample_rate_bg)
-            .add_segment(vol_str, theme.text, theme.volume_bg)
-            .add_segment(play_mode_str, theme.playing_mode_fg, theme.playing_mode_bg)
-            .add_segment(current_time, theme.timer_fg, theme.timer_bg);
+        let group = TriangleSegmentGroup::new([
+            SegmentData::new(app_mode_formatted, mode_color.0, mode_color.1),
+            SegmentData::new(sample_rate_str, sample_rate_color, theme.sample_rate_bg),
+            SegmentData::new(vol_str, theme.text, theme.volume_bg),
+            SegmentData::new(play_mode_str, theme.playing_mode_fg, theme.playing_mode_bg),
+            SegmentData::new(current_time, theme.timer_fg, theme.timer_bg),
+        ]);
 
         let mut constraints = group.constraints();
         constraints.push(Constraint::Fill(1));
