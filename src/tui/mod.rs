@@ -32,6 +32,7 @@ use crate::{
     },
 };
 
+pub mod collapsible;
 pub mod image;
 pub mod media_info;
 pub mod queue_list;
