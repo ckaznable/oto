@@ -35,7 +35,7 @@ impl PlayerEventLoopConfig {
         }
     }
 
-    fn with_out_play(path: Option<PathBuf>, device: String) -> Self {
+    fn without_play(path: Option<PathBuf>, device: String) -> Self {
         let mut config = Self::new(path, device);
         config.play = false;
         config
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
 
             use enclose::enclose;
             std::thread::spawn(enclose!((app_tx) move || {
-                if let Err(e) = player_event_loop(PlayerEventLoopConfig::with_out_play(path, device), app_tx.clone(), mpris_tx, player_rx) {
+                if let Err(e) = player_event_loop(PlayerEventLoopConfig::without_play(path, device), app_tx.clone(), mpris_tx, player_rx) {
                     app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
                     log::error!("{e:?}");
                 }
