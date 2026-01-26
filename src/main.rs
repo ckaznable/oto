@@ -35,7 +35,11 @@ fn main() -> Result<()> {
         }
         cli::Commands::Tui { path, device } => {
             WriteLogger::init(
-                LevelFilter::Info,
+                if cfg!(debug_assertions) {
+                    LevelFilter::Debug
+                } else {
+                    LevelFilter::Info
+                },
                 simplelog::Config::default(),
                 std::fs::File::create("/tmp/oto.log").unwrap(),
             )
