@@ -43,16 +43,20 @@ impl StatefulWidget for MediaInfo {
             return;
         }
 
-        let layout = Layout::vertical([
-            Constraint::Length(inner.width / 2),
-            Constraint::Length(1),
-            Constraint::Length(title_height),
-            Constraint::Length(1),
-            Constraint::Length(artist_height),
-            Constraint::Length(1),
-            Constraint::Length(album_height),
-            Constraint::Fill(1),
-        ]);
+        let layout = if inner.height < 25 {
+            Layout::vertical([Constraint::Fill(1)])
+        } else {
+            Layout::vertical([
+                Constraint::Length(inner.width / 2),
+                Constraint::Length(1),
+                Constraint::Length(title_height),
+                Constraint::Length(1),
+                Constraint::Length(artist_height),
+                Constraint::Length(1),
+                Constraint::Length(album_height),
+                Constraint::Fill(1),
+            ])
+        };
 
         let areas = layout.split(inner);
 
@@ -63,19 +67,21 @@ impl StatefulWidget for MediaInfo {
             }
         }
 
-        Paragraph::new(title)
-            .style(Style::default().fg(theme.media_title).bold())
-            .alignment(Alignment::Center)
-            .render(areas[2], buf);
+        if areas.len() > 1 {
+            Paragraph::new(title)
+                .style(Style::default().fg(theme.media_title).bold())
+                .alignment(Alignment::Center)
+                .render(areas[2], buf);
 
-        Paragraph::new(format!("by {}", artist))
-            .style(Style::default().fg(theme.media_artist))
-            .alignment(Alignment::Center)
-            .render(areas[4], buf);
+            Paragraph::new(format!("by {}", artist))
+                .style(Style::default().fg(theme.media_artist))
+                .alignment(Alignment::Center)
+                .render(areas[4], buf);
 
-        Paragraph::new(album)
-            .style(Style::default().fg(theme.media_album))
-            .alignment(Alignment::Center)
-            .render(areas[6], buf);
+            Paragraph::new(album)
+                .style(Style::default().fg(theme.media_album))
+                .alignment(Alignment::Center)
+                .render(areas[6], buf);
+        }
     }
 }
