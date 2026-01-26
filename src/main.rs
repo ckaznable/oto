@@ -19,6 +19,29 @@ use oto::{
     volume::VolumeController,
 };
 
+#[derive(Default)]
+struct PlayerEventLoopConfig {
+    path: Option<PathBuf>,
+    device: String,
+    play: bool,
+}
+
+impl PlayerEventLoopConfig {
+    fn new(path: Option<PathBuf>, device: String) -> Self {
+        Self {
+            path,
+            device,
+            play: true,
+        }
+    }
+
+    fn with_out_play(path: Option<PathBuf>, device: String) -> Self {
+        let mut config = Self::new(path, device);
+        config.play = false;
+        config
+    }
+}
+
 fn main() -> Result<()> {
     let args = cli::Args::parse();
 
@@ -31,7 +54,12 @@ fn main() -> Result<()> {
     match args.command {
         cli::Commands::Play { path, device } => {
             spawn_mock_app_event_handler(app_rx);
-            player_event_loop(path, device, app_tx, mpris_tx, player_rx)
+            player_event_loop(
+                PlayerEventLoopConfig::new(path, device),
+                app_tx,
+                mpris_tx,
+                player_rx,
+            )
         }
         cli::Commands::Tui { path, device } => {
             WriteLogger::init(
@@ -49,7 +77,7 @@ fn main() -> Result<()> {
 
             use enclose::enclose;
             std::thread::spawn(enclose!((app_tx) move || {
-                if let Err(e) = player_event_loop(path, device, app_tx.clone(), mpris_tx, player_rx) {
+                if let Err(e) = player_event_loop(PlayerEventLoopConfig::with_out_play(path, device), app_tx.clone(), mpris_tx, player_rx) {
                     app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
                     log::error!("{e:?}");
                 }
@@ -94,12 +122,17 @@ fn redirect_stderr_to_log() -> Redirect<PipeWriter> {
 }
 
 fn player_event_loop(
-    path: Option<PathBuf>,
-    device: String,
+    config: PlayerEventLoopConfig,
     tx: Sender<AppCommand>,
     mtx: Sender<MprisCommand>,
     rx: Receiver<PlayerCommand>,
 ) -> Result<()> {
+    let PlayerEventLoopConfig {
+        path,
+        device,
+        play: init_play,
+    } = config;
+
     let mut player = BufferPlayer::new(path)?;
     player.init()?;
 
@@ -124,6 +157,8 @@ fn player_event_loop(
         mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
             .ok();
     }
+
+    let mut init = false;
 
     loop {
         if let Ok(cmd) = rx.try_recv() {
@@ -272,6 +307,14 @@ fn player_event_loop(
 
         if !matches!(output.state(), State::Running | State::Paused) {
             output.start()?;
+            if !init && !init_play {
+                output.pause(true)?;
+                mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
+                    .ok();
+                tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Normal))
+                    .ok();
+            }
+            init = true;
         }
     }
 
