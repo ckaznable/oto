@@ -26,6 +26,7 @@ impl CollapsibleWidget<AppState> for QueueList {
 
         let is_compact = area.width <= LAYOUT_WIDTH_S;
 
+        // TODO: alloc to stack
         let rows: Vec<Row> = playlist
             .list
             .iter()
@@ -89,18 +90,6 @@ impl CollapsibleWidget<AppState> for QueueList {
         let [table_area, scrollbar_area] = layout.areas(area);
         let table_area = table_area.inner(Margin::new(1, 0));
 
-        let widths = if is_compact {
-            vec![Constraint::Fill(1), Constraint::Length(6)]
-        } else {
-            vec![
-                Constraint::Length(2),
-                Constraint::Fill(1),
-                Constraint::Fill(1),
-                Constraint::Length(6),
-                Constraint::Length(6),
-            ]
-        };
-
         let visible_height = table_area.height.saturating_sub(1) as usize; // Subtract 1 for header
         let offset = calculate_scroll_offset(cursor_index, visible_height, list_len);
 
@@ -125,7 +114,23 @@ impl CollapsibleWidget<AppState> for QueueList {
         )
         .height(1);
 
-        let table = Table::new(visible_rows, widths)
+        let table = Table::new(visible_rows, if is_compact {
+                [
+                    Constraint::Fill(1),
+                    Constraint::Length(6),
+                    Constraint::Length(0),
+                    Constraint::Length(0),
+                    Constraint::Length(0),
+                ]
+            } else {
+                [
+                    Constraint::Length(2),
+                    Constraint::Fill(1),
+                    Constraint::Fill(1),
+                    Constraint::Length(6),
+                    Constraint::Length(6),
+                ]
+            })
             .header(header)
             .column_spacing(1)
             .row_highlight_style(Style::default().bg(theme.surface1));
