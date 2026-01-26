@@ -129,7 +129,6 @@ impl PcmDecoder {
 
         // Store the track identifier and decoder
         let track_id = track.id;
-        let decoder = decoder;
 
         Ok(Self {
             format,

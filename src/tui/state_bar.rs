@@ -214,7 +214,7 @@ impl StatefulWidget for StateBar {
             .add_segment(app_mode_formatted, mode_color.0, mode_color.1)
             .add_segment(sample_rate_str, sample_rate_color, theme.sample_rate_bg)
             .add_segment(vol_str, theme.text, theme.volume_bg)
-            .add_segment(play_mode_str, theme.text, theme.volume_icon_bg)
+            .add_segment(play_mode_str, theme.playing_mode_fg, theme.playing_mode_bg)
             .add_segment(current_time, theme.timer_fg, theme.timer_bg);
 
         let mut constraints = group.constraints();
