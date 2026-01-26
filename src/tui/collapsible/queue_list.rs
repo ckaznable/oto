@@ -1,6 +1,7 @@
 use ratatui::{
     layout::{Constraint, Layout, Margin},
     prelude::*,
+    text::Span,
     widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, StatefulWidget, Table, Widget},
 };
 
@@ -160,6 +161,7 @@ impl CollapsibleWidget<AppState> for QueueList {
     }
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+        let theme = &state.theme;
         let playlist = state.playlist.borrow();
         let playing_index = state.ui_state.borrow().queue.playing_index;
         let playing = playlist
@@ -169,11 +171,19 @@ impl CollapsibleWidget<AppState> for QueueList {
             .find(|(i, _)| playing_index == *i);
 
         if let Some((_, track)) = playing {
-            Line::from(format!(
-                " {} - {}",
-                track.title.as_deref().unwrap_or_default(),
-                track.artist.as_deref().unwrap_or_default()
-            ))
+            Line::from(vec![
+                Span::raw(" "),
+                Span::styled(
+                    track.title.as_deref().unwrap_or_default(),
+                    Style::default().fg(theme.media_title),
+                ),
+                Span::raw(" - "),
+                Span::styled(
+                    track.artist.as_deref().unwrap_or_default(),
+                    Style::default().fg(theme.media_artist),
+                ),
+            ])
+            .style(Style::default().bg(theme.surface1))
             .render(area, buf);
         }
     }
