@@ -15,11 +15,10 @@ impl CollapsibleWidget<AppState> for QueueList {
         let list_len = playlist.list.len();
         let playlist_index = playlist.index;
 
-        {
-            let mut ui_state = state.ui_state.borrow_mut();
-            ui_state.queue.set_content_length(list_len);
-            ui_state.queue.playing_index = playlist_index;
-        }
+        let mut ui_state = state.ui_state.borrow_mut();
+        ui_state.queue.set_content_length(list_len);
+        ui_state.queue.playing_index = playlist_index;
+        drop(ui_state);
 
         let cursor_index = state.ui_state.borrow().queue.cursor_index;
         let playing_index = state.ui_state.borrow().queue.playing_index;
@@ -114,7 +113,9 @@ impl CollapsibleWidget<AppState> for QueueList {
         )
         .height(1);
 
-        let table = Table::new(visible_rows, if is_compact {
+        let table = Table::new(
+            visible_rows,
+            if is_compact {
                 [
                     Constraint::Fill(1),
                     Constraint::Length(6),
@@ -130,10 +131,11 @@ impl CollapsibleWidget<AppState> for QueueList {
                     Constraint::Length(6),
                     Constraint::Length(6),
                 ]
-            })
-            .header(header)
-            .column_spacing(1)
-            .row_highlight_style(Style::default().bg(theme.surface1));
+            },
+        )
+        .header(header)
+        .column_spacing(1)
+        .row_highlight_style(Style::default().bg(theme.surface1));
 
         Widget::render(table, table_area, buf);
 
@@ -158,7 +160,22 @@ impl CollapsibleWidget<AppState> for QueueList {
     }
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-        todo!()
+        let playlist = state.playlist.borrow();
+        let playing_index = state.ui_state.borrow().queue.playing_index;
+        let playing = playlist
+            .list
+            .iter()
+            .enumerate()
+            .find(|(i, _)| playing_index == *i);
+
+        if let Some((_, track)) = playing {
+            Line::from(format!(
+                " {} - {}",
+                track.title.as_deref().unwrap_or_default(),
+                track.artist.as_deref().unwrap_or_default()
+            ))
+            .render(area, buf);
+        }
     }
 }
 
