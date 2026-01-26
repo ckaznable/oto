@@ -27,15 +27,14 @@ use crate::{
     media::{MediaSpec, TrackMeta},
     player::PlayList,
     tui::{
-        image::LruProtocolFactory, media_info::MediaInfo, queue_list::QueueList, state::UiState,
-        state_bar::StateBar, theme::Theme,
+        collapsible::CollapsibleWidgetGroup, image::LruProtocolFactory, media_info::MediaInfo,
+        state::UiState, state_bar::StateBar, theme::Theme,
     },
 };
 
 pub mod collapsible;
 pub mod image;
 pub mod media_info;
-pub mod queue_list;
 pub mod state;
 pub mod state_bar;
 pub mod theme;
@@ -244,10 +243,10 @@ fn render(frame: &mut Frame, mut state: AppState) {
         [Constraint::Length(30), Constraint::Fill(1)]
     });
 
-    let [media_info, queue] = layout.areas(content);
+    let [media_info, main] = layout.areas(content);
 
     if area.width > LAYOUT_WIDTH_S {
-        frame.render_stateful_widget(QueueList, queue, &mut state);
+        frame.render_stateful_widget(CollapsibleWidgetGroup, main, &mut state);
     }
 
     frame.render_stateful_widget(MediaInfo, media_info, &mut state);

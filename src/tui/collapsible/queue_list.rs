@@ -4,14 +4,12 @@ use ratatui::{
     widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, StatefulWidget, Table, Widget},
 };
 
-use crate::tui::{AppState, LAYOUT_WIDTH_S};
+use crate::tui::{AppState, LAYOUT_WIDTH_S, collapsible::CollapsibleWidget};
 
 pub struct QueueList;
 
-impl StatefulWidget for QueueList {
-    type State = AppState;
-
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+impl CollapsibleWidget<AppState> for QueueList {
+    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let playlist = state.playlist.borrow();
         let list_len = playlist.list.len();
@@ -152,6 +150,10 @@ impl StatefulWidget for QueueList {
         );
 
         state.ui_state.borrow_mut().queue.scroll_state = scroll_state;
+    }
+
+    fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+        todo!()
     }
 }
 

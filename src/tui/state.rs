@@ -104,4 +104,5 @@ pub struct UiState {
     pub queue: QueueState,
     pub media_info: MediaInfoState,
     pub cover: Option<UnCachedProtocol>,
+    pub expand_index: usize,
 }
