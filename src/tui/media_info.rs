@@ -63,7 +63,7 @@ impl StatefulWidget for MediaInfo {
         {
             use ratatui_image::StatefulImage;
             if let Some(cover) = state.ui_state.borrow_mut().cover.as_mut() {
-                StatefulImage::new().render(areas[0], buf, cover);
+                StatefulImage::new().render(areas[0].centered_horizontally(Constraint::Ratio(4, 5)), buf, cover);
             }
         }
 
