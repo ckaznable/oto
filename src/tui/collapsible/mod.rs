@@ -5,6 +5,14 @@ use crate::tui::AppState;
 pub trait CollapsibleWidget<T> {
     fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut T);
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut T);
+
+    fn render(&self, area: Rect, buf: &mut Buffer, state: &mut T) {
+        match area.height {
+            0 => (),
+            1 => self.render_collapse(area, buf, state),
+            _ => self.render_expand(area, buf, state),
+        }
+    }
 }
 
 pub struct CollapsibleWidgetGroup<T> {
@@ -28,11 +36,7 @@ impl StatefulWidget for CollapsibleWidgetGroup<AppState> {
         let areas = layout.split(area);
         self.widgets.into_iter().enumerate().for_each(|(i, w)| {
             let area = areas[i];
-            if area.height <= 1 {
-                w.render_collapse(area, buf, state);
-            } else {
-                w.render_expand(area, buf, state);
-            }
+            w.render(area, buf, state);
         });
     }
 }
