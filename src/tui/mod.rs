@@ -229,6 +229,12 @@ fn app(
                         .map(|p| p.update_resized_protocol(stateful_protocol));
                 }
             },
+            AppCommand::DevicesList(devices) => {
+                log::info!("devices: {devices:?}");
+            }
+            AppCommand::DeviceUpdate(device) => {
+                log::info!("current device: {device:?}");
+            }
         }
 
         if force_render || timer.elapsed() >= min_refresh_duration {

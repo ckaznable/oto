@@ -13,6 +13,7 @@ use anyhow::Result;
 use clap::Parser;
 use oto::{
     cli,
+    devices::{get_default_device, list_devices},
     event::{AppCommand, MprisCommand, PlayerCommand},
     mpris,
     player::{AudioOutput, BufferPlayer, LastPlayerState, PlayerError},
@@ -22,12 +23,12 @@ use oto::{
 #[derive(Default)]
 struct PlayerEventLoopConfig {
     path: Option<PathBuf>,
-    device: String,
+    device: Option<String>,
     play: bool,
 }
 
 impl PlayerEventLoopConfig {
-    fn new(path: Option<PathBuf>, device: String) -> Self {
+    fn new(path: Option<PathBuf>, device: Option<String>) -> Self {
         Self {
             path,
             device,
@@ -35,7 +36,7 @@ impl PlayerEventLoopConfig {
         }
     }
 
-    fn without_play(path: Option<PathBuf>, device: String) -> Self {
+    fn without_play(path: Option<PathBuf>, device: Option<String>) -> Self {
         let mut config = Self::new(path, device);
         config.play = false;
         config
@@ -127,11 +128,17 @@ fn player_event_loop(
     mtx: Sender<MprisCommand>,
     rx: Receiver<PlayerCommand>,
 ) -> Result<()> {
+    let devices = list_devices();
+
     let PlayerEventLoopConfig {
         path,
         device,
         play: init_play,
     } = config;
+
+    let mut device = device
+        .or_else(|| get_default_device(&devices).map(|(p, d)| format!("hw:{p},{d}")))
+        .unwrap_or_else(|| "hw:0,0".to_string());
 
     let mut player = BufferPlayer::new(path)?;
     player.init()?;
@@ -149,6 +156,7 @@ fn player_event_loop(
 
     let mut current_time = 0.;
     if let Some(track) = player.current() {
+        tx.send(AppCommand::DevicesList(devices)).ok();
         tx.send(AppCommand::TrackUpdate(track.clone(), init_spec))
             .ok();
         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
@@ -156,6 +164,21 @@ fn player_event_loop(
         mtx.send(MprisCommand::TrackUpdate(track, init_spec)).ok();
         mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
             .ok();
+
+        // hw:0,0 -> 0,0
+        let mut pcm_index = device.split_off(device.find(":").unwrap() + 1);
+        // 0,0 -> 0, 0
+        let device_index =
+            pcm_index.split_off(pcm_index.find(",").unwrap_or(pcm_index.len() - 1) + 1);
+        let device_index = if device_index.is_empty() {
+            0i32
+        } else {
+            device_index.parse::<i32>()?
+        };
+        // 0, 0 -> 0 0
+        pcm_index.truncate(pcm_index.len() - 1);
+        let alsa_index = (pcm_index.parse::<i32>()?, device_index);
+        tx.send(AppCommand::DeviceUpdate(alsa_index)).ok();
     }
 
     let mut init = false;
@@ -254,6 +277,9 @@ fn player_event_loop(
                             .ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
+                }
+                PlayerCommand::GetDevices => {
+                    tx.send(AppCommand::DevicesList(list_devices())).ok();
                 }
             }
         }

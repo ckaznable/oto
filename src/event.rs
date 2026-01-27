@@ -1,4 +1,5 @@
 use crate::{
+    devices::AudioPCM,
     media::{MediaSpec, TrackMeta},
     player::PlayList,
     tui::{AppMode, image::ProtocolLruResult},
@@ -14,6 +15,7 @@ pub enum PlayerCommand {
     NextSong,
     PrevSong,
     PlayTrackWithIndex(usize),
+    GetDevices,
 }
 
 pub enum AppCommand {
@@ -30,6 +32,8 @@ pub enum AppCommand {
     MoveCollapseCursor(i16),
     PickTrack,
     ImageEncodeResult(ProtocolLruResult),
+    DevicesList(Vec<AudioPCM>),
+    DeviceUpdate((i32, i32)),
 }
 
 #[derive(Clone)]

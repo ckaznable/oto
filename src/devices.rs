@@ -1,40 +1,91 @@
 use std::{collections::HashSet, fs, path::Path};
 
-use alsa::card::Iter;
+use alsa::{Ctl, Direction, card::Iter, ctl::DeviceIter};
 
-#[derive(Debug)]
-pub struct AudioDevice {
+#[derive(Debug, Clone)]
+pub struct AudioPCM {
     pub index: i32,
     pub name: Option<String>,
     pub long_name: Option<String>,
     pub caps: CardCapabilities,
+    pub devices: Vec<AudioDevice>,
 }
 
-#[derive(Debug, Default, Clone)]
+impl AudioPCM {
+    pub fn get_default(&self) -> (i32, i32) {
+        match self.devices.first() {
+            Some(d) => (self.index, d.index),
+            _ => (self.index, 0),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AudioDevice {
+    pub index: i32,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct CardCapabilities {
     pub formats: Vec<String>,
+    pub is_usb_dac: bool,
     pub rates: Vec<u32>,
     pub channels: Vec<u32>,
     pub dsd: bool,
     pub dop: bool,
 }
 
-pub fn list_devices() -> Vec<AudioDevice> {
-    let mut devices = Vec::new();
+impl Default for CardCapabilities {
+    fn default() -> Self {
+        Self {
+            is_usb_dac: false,
+            formats: vec!["S16_LE".to_string(), "S32_LE".to_string()],
+            rates: vec![44100, 48000],
+            channels: vec![2],
+            dsd: false,
+            dop: false,
+        }
+    }
+}
+
+pub fn get_default_device(pcm: &[AudioPCM]) -> Option<(i32, i32)> {
+    pcm.iter()
+        .find(|p| p.caps.is_usb_dac)
+        .map(|p| p.get_default())
+        .or_else(|| pcm.first().map(|p| p.get_default()))
+}
+
+pub fn list_devices() -> Vec<AudioPCM> {
+    let mut pcm: Vec<AudioPCM> = Vec::new();
 
     let iter = Iter::new();
     for card in iter.flatten() {
         let index = card.get_index();
-        if let Some(caps) = get_stream0_caps(index as u32) {
-            devices.push(AudioDevice {
-                index,
-                caps,
-                name: card.get_name().ok(),
-                long_name: card.get_longname().ok(),
-            });
-        }
+        let caps = get_stream0_caps(index as u32).unwrap_or_default();
+        let Ok(ctl) = Ctl::from_card(&card, false) else {
+            continue;
+        };
+
+        let devices: Vec<AudioDevice> = DeviceIter::new(&ctl)
+            .filter_map(|index| {
+                let info = ctl.pcm_info(index as u32, 0, Direction::Playback).ok()?;
+                Some(AudioDevice {
+                    index,
+                    name: info.get_name().map(|s| s.to_owned()).ok(),
+                })
+            })
+            .collect();
+
+        pcm.push(AudioPCM {
+            index,
+            caps,
+            name: card.get_name().ok(),
+            long_name: card.get_longname().ok(),
+            devices,
+        });
     }
-    devices
+    pcm
 }
 
 pub fn get_stream0_caps(card_num: u32) -> Option<CardCapabilities> {
@@ -124,6 +175,7 @@ pub fn get_stream0_caps(card_num: u32) -> Option<CardCapabilities> {
         formats,
         rates,
         channels,
+        is_usb_dac: true,
         dsd: supports_dsd,
         dop: supports_dop,
     })

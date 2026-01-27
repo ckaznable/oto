@@ -16,7 +16,7 @@ pub enum Commands {
         path: Option<PathBuf>,
 
         #[arg(short, long)]
-        device: String,
+        device: Option<String>,
     },
 
     Tui {
@@ -24,7 +24,7 @@ pub enum Commands {
         path: Option<PathBuf>,
 
         #[arg(short, long)]
-        device: String,
+        device: Option<String>,
     },
 }
 
