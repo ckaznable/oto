@@ -27,6 +27,7 @@ pub enum AppCommand {
     PlaylistUpdate(PlayList),
     Rerender(bool),
     MoveQueueCursor(i16),
+    MoveCollapseCursor(i16),
     PickTrack,
     ImageEncodeResult(ProtocolLruResult),
 }

@@ -8,7 +8,7 @@ use std::{
     sync::mpsc::{Receiver, Sender},
     time::{Duration, Instant},
 };
-use strum::Display;
+use strum::{Display, EnumCount};
 
 use ratatui::{
     DefaultTerminal, Frame,
@@ -27,8 +27,12 @@ use crate::{
     media::{MediaSpec, TrackMeta},
     player::PlayList,
     tui::{
-        collapsible::CollapsibleWidgetGroup, image::LruProtocolFactory, media_info::MediaInfo,
-        state::UiState, state_bar::StateBar, theme::Theme,
+        collapsible::{CollapseWidgets, CollapsibleWidgetGroup},
+        image::LruProtocolFactory,
+        media_info::MediaInfo,
+        state::UiState,
+        state_bar::StateBar,
+        theme::Theme,
     },
 };
 
@@ -197,6 +201,17 @@ fn app(
                     force_render = true;
                 }
             }
+            AppCommand::MoveCollapseCursor(steps) => {
+                let mut ui_state = state.ui_state.borrow_mut();
+                let index = ui_state.expand_index;
+
+                ui_state.expand_index = if steps > 0 {
+                    index + steps as usize
+                } else {
+                    index.saturating_sub(steps.unsigned_abs() as usize)
+                }
+                .clamp(0, CollapseWidgets::COUNT - 1)
+            }
             AppCommand::PickTrack => {
                 let index = state.ui_state.borrow().queue.cursor_index;
                 player_tx
@@ -273,18 +288,30 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     player_tx.send(PlayerCommand::PauseCycle).ok();
                 }
                 KeyEvent {
+                    code: KeyCode::Char('J'),
+                    ..
+                } => {
+                    player_tx.send(PlayerCommand::SetRelatedVolume(-5)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('K'),
+                    ..
+                } => {
+                    player_tx.send(PlayerCommand::SetRelatedVolume(5)).ok();
+                }
+                KeyEvent {
                     code: KeyCode::Char('j'),
                     modifiers: KeyModifiers::CONTROL,
                     ..
                 } => {
-                    player_tx.send(PlayerCommand::SetRelatedVolume(-5)).ok();
+                    tx.send(AppCommand::MoveCollapseCursor(1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('k'),
                     modifiers: KeyModifiers::CONTROL,
                     ..
                 } => {
-                    player_tx.send(PlayerCommand::SetRelatedVolume(5)).ok();
+                    tx.send(AppCommand::MoveCollapseCursor(-1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('j'),
