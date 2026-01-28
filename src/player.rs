@@ -107,7 +107,10 @@ impl AudioOutput {
         self.set_sw_param(spec)?;
 
         let status = self.inner.status()?;
-        if !matches!(status.get_state(), State::Running | State::Prepared | State::Paused) {
+        if !matches!(
+            status.get_state(),
+            State::Running | State::Prepared | State::Paused
+        ) {
             self.inner.prepare()?;
         }
 
@@ -306,33 +309,46 @@ impl BufferPlayer {
     }
 
     pub fn calc_duration(&self, delay: u64) -> f64 {
-        let (written_frames, sample_rate) = self.get_written_frames();
-        if written_frames == 0 {
-            return 0.
-        }
+        let Some((written_frames, sample_rate)) = self.get_written_frames() else {
+            return 0.;
+        };
 
         let actual_played_frames = written_frames.saturating_sub(delay);
         actual_played_frames as f64 / sample_rate as f64
     }
 
-    pub fn get_written_frames(&self) -> (u64, u32) {
-        match self.spec {
-            None => (0, 0),
-            Some(MediaSpec {
+    pub fn get_written_frames(&self) -> Option<(u64, u32)> {
+        match self.spec? {
+            MediaSpec {
                 sample_rate,
                 mode: OutputMode::PCM,
                 channels,
                 ..
-            }) => (self.written_sample_count / channels as u64, sample_rate),
-            Some(MediaSpec {
+            } => Some((self.written_sample_count / channels as u64, sample_rate)),
+            MediaSpec {
                 sample_rate,
                 mode: OutputMode::DSD,
                 channels,
                 ..
-            }) => (
+            } => Some((
                 self.written_sample_count * 32 / channels as u64,
                 sample_rate,
-            ),
+            )),
+        }
+    }
+
+    pub fn get_samples_from_frames(&self, frames: u64) -> Option<u64> {
+        match self.spec? {
+            MediaSpec {
+                mode: OutputMode::PCM,
+                channels,
+                ..
+            } => Some(frames * channels as u64),
+            MediaSpec {
+                mode: OutputMode::DSD,
+                channels,
+                ..
+            } => Some(frames * channels as u64 / 32),
         }
     }
 }
