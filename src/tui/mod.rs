@@ -239,15 +239,18 @@ fn app(
                     .send(PlayerCommand::PlayTrackWithIndex(index))
                     .ok();
             }
-            AppCommand::ImageEncodeResult(result) => match result {
-                image::ProtocolLruResult::Cached(_) => todo!(),
-                image::ProtocolLruResult::UnCached(_, stateful_protocol) => {
-                    let _ = state
-                        .ui_state
-                        .borrow_mut()
-                        .cover
-                        .as_mut()
-                        .map(|p| p.update_resized_protocol(stateful_protocol));
+            AppCommand::ImageEncodeResult(result) => {
+                force_render = true;
+                match result {
+                    image::ProtocolLruResult::Cached(_) => todo!(),
+                    image::ProtocolLruResult::UnCached(_, stateful_protocol) => {
+                        let _ = state
+                            .ui_state
+                            .borrow_mut()
+                            .cover
+                            .as_mut()
+                            .map(|p| p.update_resized_protocol(stateful_protocol));
+                    }
                 }
             }
             AppCommand::DevicesList(devices) => {
