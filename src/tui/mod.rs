@@ -233,11 +233,34 @@ fn app(
                 }
                 .clamp(0, CollapseWidgets::COUNT - 1)
             }
-            AppCommand::PickTrack => {
-                let index = state.ui_state.borrow().queue.cursor_index;
-                player_tx
-                    .send(PlayerCommand::PlayTrackWithIndex(index))
-                    .ok();
+            AppCommand::SelectItem => {
+                let ui_state = state.ui_state.borrow();
+                match CollapseWidgets::get(ui_state.expand_index) {
+                    CollapseWidgets::QueueList => {
+                        let index = ui_state.queue.cursor_index;
+                        player_tx
+                            .send(PlayerCommand::PlayTrackWithIndex(index))
+                            .ok();
+                    }
+                    CollapseWidgets::DevicesList => {
+                        let index = ui_state.devices.cursor_index;
+                        let list = &state.devices.borrow().list;
+                        let mut tmp = 0usize;
+                        let mut d = None;
+                        for card in list {
+                            tmp += card.devices.len();
+                            if tmp > index {
+                                d = Some((card.index, card.devices[card.devices.len().saturating_sub(tmp - index)].index));
+                                break;
+                            }
+                        }
+
+                        if let Some(d) = d {
+                            player_tx.send(PlayerCommand::SetDevice(d)).ok();
+                        }
+                    }
+                    _ => (),
+                };
             }
             AppCommand::ImageEncodeResult(result) => {
                 force_render = true;
@@ -375,7 +398,7 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     code: KeyCode::Enter,
                     ..
                 } => {
-                    tx.send(AppCommand::PickTrack).ok();
+                    tx.send(AppCommand::SelectItem).ok();
                 }
                 _ => {}
             },

@@ -16,6 +16,7 @@ pub enum PlayerCommand {
     PrevSong,
     PlayTrackWithIndex(usize),
     GetDevices,
+    SetDevice((i32, i32)),
 }
 
 pub enum AppCommand {
@@ -30,7 +31,7 @@ pub enum AppCommand {
     Rerender(bool),
     MoveListCursor(i16),
     MoveCollapseCursor(i16),
-    PickTrack,
+    SelectItem,
     ImageEncodeResult(ProtocolLruResult),
     DevicesList(Vec<PlaybackPCM>),
     DeviceUpdate((i32, i32)),

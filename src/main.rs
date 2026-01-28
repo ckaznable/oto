@@ -136,7 +136,7 @@ fn player_event_loop(
         play: init_play,
     } = config;
 
-    let mut device = device
+    let init_device = device
         .or_else(|| get_default_device(&devices).map(|(p, d)| format!("hw:{p},{d}")))
         .unwrap_or_else(|| "hw:0,0".to_string());
 
@@ -145,15 +145,16 @@ fn player_event_loop(
 
     let init_spec = player.spec.unwrap();
 
-    let mut output = AudioOutput::new(&device)?;
+    let mut output = AudioOutput::new(&init_device)?;
     output.init(init_spec)?;
 
-    let vc = VolumeController::new(&device);
+    let mut vc = VolumeController::new(&init_device);
     let mut volume = vc.get_volume().unwrap_or(0);
 
     tx.send(AppCommand::VolumeUpdate(volume as u8)).ok();
     mtx.send(MprisCommand::VolumeUpdate(volume as u8)).ok();
 
+    // init tui state
     let mut current_time = 0.;
     if let Some(track) = player.current() {
         tx.send(AppCommand::DevicesList(devices)).ok();
@@ -166,6 +167,7 @@ fn player_event_loop(
             .ok();
 
         // hw:0,0 -> 0,0
+        let mut device = init_device.clone();
         let mut pcm_index = device.split_off(device.find(":").unwrap() + 1);
         // 0,0 -> 0, 0
         let device_index =
@@ -281,6 +283,25 @@ fn player_event_loop(
                 PlayerCommand::GetDevices => {
                     tx.send(AppCommand::DevicesList(list_devices())).ok();
                 }
+                PlayerCommand::SetDevice(d) => {
+                    let mut device = format!("hw:{},{}", d.0, d.1);
+                    log::info!("try to set {device}");
+
+                    if output.replace(&device).is_err() {
+                        output.replace(&init_device)?;
+                        device = init_device.clone();
+                    };
+
+                    output.init(player.spec.unwrap())?;
+                    vc.set_device(&device);
+                    tx.send(AppCommand::DeviceUpdate(d)).ok();
+
+                    volume = vc.get_volume().unwrap_or(0);
+                    tx.send(AppCommand::VolumeUpdate(volume as u8)).ok();
+                    mtx.send(MprisCommand::VolumeUpdate(volume as u8)).ok();
+
+                    player.clear_buffer();
+                }
             }
         }
 
@@ -344,6 +365,5 @@ fn player_event_loop(
         }
     }
 
-    output.drain()?;
     Ok(())
 }

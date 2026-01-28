@@ -20,28 +20,35 @@ use crate::{
 };
 
 pub struct AudioOutput {
-    output: PCM,
+    inner: PCM,
 }
 
 impl AudioOutput {
     pub fn new(device_name: impl AsRef<str>) -> Result<Self> {
-        let output = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
+        let inner = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
 
-        Ok(Self { output })
+        Ok(Self { inner })
+    }
+
+    pub fn replace(&mut self, device_name: impl AsRef<str>) -> Result<()> {
+        self.inner.pause(true)?;
+        self.inner.drop()?;
+        self.inner = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
+        Ok(())
     }
 
     pub fn write_io(&self, buf: &[i32], spec: MediaSpec) -> Result<usize> {
         let channel = spec.channels as usize;
         match spec.mode {
             OutputMode::PCM => {
-                if let Ok(io) = self.output.io_i32() {
+                if let Ok(io) = self.inner.io_i32() {
                     Ok(io.writei(buf)? * channel)
                 } else {
                     Ok(0)
                 }
             }
             OutputMode::DSD => {
-                let io = unsafe { self.output.io_unchecked::<u32>() };
+                let io = unsafe { self.inner.io_unchecked::<u32>() };
                 Ok(io.writei(cast_slice(buf))? * channel)
             }
         }
@@ -56,22 +63,22 @@ impl AudioOutput {
     }
 
     pub fn pcm_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
-        let hwp = HwParams::any(&self.output)?;
+        let hwp = HwParams::any(&self.inner)?;
         hwp.set_channels(channel)?;
         hwp.set_rate(sample_rate, alsa::ValueOr::Nearest)?;
         hwp.set_format(alsa::pcm::Format::S32LE)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
-        self.output.hw_params(&hwp)?;
+        self.inner.hw_params(&hwp)?;
         Ok(())
     }
 
     pub fn dsd_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
-        let hwp = HwParams::any(&self.output)?;
+        let hwp = HwParams::any(&self.inner)?;
         hwp.set_channels(channel)?;
         hwp.set_format(alsa::pcm::Format::DSDU32BE)?;
         hwp.set_rate(sample_rate / 32, alsa::ValueOr::Nearest)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
-        self.output.hw_params(&hwp)?;
+        self.inner.hw_params(&hwp)?;
         Ok(())
     }
 
@@ -84,10 +91,10 @@ impl AudioOutput {
     }
 
     pub fn pcm_sw_param(&self) -> Result<()> {
-        let swp = self.output.sw_params_current()?;
-        let hwp = self.output.hw_params_current()?;
+        let swp = self.inner.sw_params_current()?;
+        let hwp = self.inner.hw_params_current()?;
         swp.set_start_threshold(hwp.get_buffer_size().unwrap())?;
-        self.output.sw_params(&swp)?;
+        self.inner.sw_params(&swp)?;
         Ok(())
     }
 
@@ -99,9 +106,9 @@ impl AudioOutput {
         self.set_hw_param(spec)?;
         self.set_sw_param(spec)?;
 
-        let status = self.output.status()?;
-        if !matches!(status.get_state(), State::Running | State::Prepared) {
-            self.output.prepare()?;
+        let status = self.inner.status()?;
+        if !matches!(status.get_state(), State::Running | State::Prepared | State::Paused) {
+            self.inner.prepare()?;
         }
 
         Ok(())
@@ -112,7 +119,7 @@ impl Deref for AudioOutput {
     type Target = PCM;
 
     fn deref(&self) -> &Self::Target {
-        &self.output
+        &self.inner
     }
 }
 
@@ -226,18 +233,6 @@ impl BufferPlayer {
         self.playlist.current().cloned()
     }
 
-    pub fn set_spec(&mut self, media_spec: MediaSpec, output: &mut AudioOutput) -> Result<()> {
-        if let Some(spec) = self.spec
-            && spec != media_spec
-        {
-            output.drop()?;
-            output.init(media_spec)?;
-            self.spec = Some(media_spec);
-        }
-
-        Ok(())
-    }
-
     pub fn consume(&mut self, output: &mut AudioOutput) -> PlayerResult {
         let mut written = 0usize;
 
@@ -311,8 +306,18 @@ impl BufferPlayer {
     }
 
     pub fn calc_duration(&self, delay: u64) -> f64 {
-        let (written_frames, sample_rate) = match self.spec {
-            None => return 0.,
+        let (written_frames, sample_rate) = self.get_written_frames();
+        if written_frames == 0 {
+            return 0.
+        }
+
+        let actual_played_frames = written_frames.saturating_sub(delay);
+        actual_played_frames as f64 / sample_rate as f64
+    }
+
+    pub fn get_written_frames(&self) -> (u64, u32) {
+        match self.spec {
+            None => (0, 0),
             Some(MediaSpec {
                 sample_rate,
                 mode: OutputMode::PCM,
@@ -328,10 +333,7 @@ impl BufferPlayer {
                 self.written_sample_count * 32 / channels as u64,
                 sample_rate,
             ),
-        };
-
-        let actual_played_frames = written_frames.saturating_sub(delay);
-        actual_played_frames as f64 / sample_rate as f64
+        }
     }
 }
 
