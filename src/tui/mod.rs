@@ -23,6 +23,7 @@ use ratatui::{
 };
 
 use crate::{
+    devices::PlaybackPCM,
     event::{AppCommand, PlayerCommand},
     media::{MediaSpec, TrackMeta},
     player::PlayList,
@@ -74,6 +75,19 @@ pub struct PlayingTrack {
     spec: MediaSpec,
 }
 
+#[derive(Clone, Default)]
+pub struct DevicesState {
+    list: Vec<PlaybackPCM>,
+    current: (i32, i32),
+}
+
+impl DevicesState {
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.list.iter().map(|p| p.devices.len()).sum()
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     app_mode: Rc<Cell<AppMode>>,
@@ -84,6 +98,7 @@ pub struct AppState {
     volume: Rc<Cell<u8>>,
     theme: Rc<Theme>,
     ui_state: Rc<RefCell<UiState>>,
+    devices: Rc<RefCell<DevicesState>>,
 }
 
 impl AppState {
@@ -97,6 +112,7 @@ impl AppState {
             volume: Rc::new(Cell::new(0)),
             theme: Rc::new(Theme::default()),
             ui_state: Rc::new(RefCell::new(UiState::default())),
+            devices: Rc::new(RefCell::new(Default::default())),
         }
     }
 }
@@ -132,7 +148,7 @@ fn app(
 
     let mut lru_protocol_factory = LruProtocolFactory::new()?;
     lru_protocol_factory.on_cached(move |result| {
-        log::info!("got image encode result");
+        log::debug!("got image encode result");
         tx.send(AppCommand::ImageEncodeResult(result)).ok();
     });
     lru_protocol_factory.spawn(picker)?;
@@ -190,16 +206,21 @@ fn app(
             AppCommand::Rerender(force) => {
                 force_render = force;
             }
-            AppCommand::MoveQueueCursor(steps) => {
-                let list_len = state.playlist.borrow().list.len();
-                if state
-                    .ui_state
-                    .borrow_mut()
-                    .queue
-                    .move_cursor(steps, list_len)
-                {
-                    force_render = true;
-                }
+            AppCommand::MoveListCursor(steps) => {
+                let index= state.ui_state.borrow().expand_index;
+                let mut ui_state = state.ui_state.borrow_mut();
+                let render = match CollapseWidgets::get(index) {
+                    CollapseWidgets::QueueList => {
+                        let len = state.playlist.borrow().list.len();
+                        ui_state.queue.move_cursor(steps, len)
+                    },
+                    CollapseWidgets::DevicesList => {
+                        let len = state.devices.borrow().len();
+                        ui_state.devices.move_cursor(steps, len)
+                    },
+                };
+
+                force_render = render;
             }
             AppCommand::MoveCollapseCursor(steps) => {
                 let mut ui_state = state.ui_state.borrow_mut();
@@ -228,12 +249,16 @@ fn app(
                         .as_mut()
                         .map(|p| p.update_resized_protocol(stateful_protocol));
                 }
-            },
+            }
             AppCommand::DevicesList(devices) => {
                 log::info!("devices: {devices:?}");
+                let mut d = state.devices.borrow_mut();
+                d.list = devices;
             }
             AppCommand::DeviceUpdate(device) => {
                 log::info!("current device: {device:?}");
+                let mut d = state.devices.borrow_mut();
+                d.current = device;
             }
         }
 
@@ -323,13 +348,13 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     code: KeyCode::Char('j'),
                     ..
                 } => {
-                    tx.send(AppCommand::MoveQueueCursor(1)).ok();
+                    tx.send(AppCommand::MoveListCursor(1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('k'),
                     ..
                 } => {
-                    tx.send(AppCommand::MoveQueueCursor(-1)).ok();
+                    tx.send(AppCommand::MoveListCursor(-1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('l'),

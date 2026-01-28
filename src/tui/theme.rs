@@ -45,6 +45,8 @@ pub struct Theme {
     pub queue_duration: Color,
     pub queue_header: Color,
     pub queue_current_bg: Color,
+    pub collapse_queue_bg: Color,
+    pub collapse_devices_bg: Color,
 }
 
 impl Theme {
@@ -93,6 +95,8 @@ impl Theme {
             queue_duration: Color::Rgb(86, 95, 137),
             queue_header: Color::Rgb(158, 206, 106),
             queue_current_bg: Color::Rgb(76, 82, 111),
+            collapse_queue_bg: Color::Rgb(36, 45, 65),
+            collapse_devices_bg: Color::Rgb(45, 32, 55),
         }
     }
 
@@ -141,6 +145,8 @@ impl Theme {
             queue_duration: Color::Rgb(166, 173, 200),
             queue_header: Color::Rgb(148, 226, 213),
             queue_current_bg: Color::Rgb(108, 112, 134),
+            collapse_queue_bg: Color::Rgb(35, 45, 60),
+            collapse_devices_bg: Color::Rgb(50, 35, 55),
         }
     }
 
@@ -189,6 +195,8 @@ impl Theme {
             queue_duration: Color::Rgb(165, 173, 203),
             queue_header: Color::Rgb(139, 213, 202),
             queue_current_bg: Color::Rgb(110, 115, 141),
+            collapse_queue_bg: Color::Rgb(40, 50, 68),
+            collapse_devices_bg: Color::Rgb(55, 40, 62),
         }
     }
 
@@ -237,6 +245,8 @@ impl Theme {
             queue_duration: Color::Rgb(165, 173, 206),
             queue_header: Color::Rgb(129, 200, 190),
             queue_current_bg: Color::Rgb(115, 121, 148),
+            collapse_queue_bg: Color::Rgb(50, 60, 78),
+            collapse_devices_bg: Color::Rgb(65, 50, 72),
         }
     }
 
@@ -285,6 +295,8 @@ impl Theme {
             queue_duration: Color::Rgb(108, 111, 133),
             queue_header: Color::Rgb(23, 146, 153),
             queue_current_bg: Color::Rgb(156, 160, 176),
+            collapse_queue_bg: Color::Rgb(190, 210, 230),
+            collapse_devices_bg: Color::Rgb(220, 200, 225),
         }
     }
 }

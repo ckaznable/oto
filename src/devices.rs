@@ -3,15 +3,15 @@ use std::{collections::HashSet, fs, path::Path};
 use alsa::{Ctl, Direction, card::Iter, ctl::DeviceIter};
 
 #[derive(Debug, Clone)]
-pub struct AudioPCM {
+pub struct PlaybackPCM {
     pub index: i32,
     pub name: Option<String>,
     pub long_name: Option<String>,
     pub caps: CardCapabilities,
-    pub devices: Vec<AudioDevice>,
+    pub devices: Vec<PlaybackDevice>,
 }
 
-impl AudioPCM {
+impl PlaybackPCM {
     pub fn get_default(&self) -> (i32, i32) {
         match self.devices.first() {
             Some(d) => (self.index, d.index),
@@ -21,7 +21,7 @@ impl AudioPCM {
 }
 
 #[derive(Debug, Clone)]
-pub struct AudioDevice {
+pub struct PlaybackDevice {
     pub index: i32,
     pub name: Option<String>,
 }
@@ -49,15 +49,15 @@ impl Default for CardCapabilities {
     }
 }
 
-pub fn get_default_device(pcm: &[AudioPCM]) -> Option<(i32, i32)> {
+pub fn get_default_device(pcm: &[PlaybackPCM]) -> Option<(i32, i32)> {
     pcm.iter()
         .find(|p| p.caps.is_usb_dac)
         .map(|p| p.get_default())
         .or_else(|| pcm.first().map(|p| p.get_default()))
 }
 
-pub fn list_devices() -> Vec<AudioPCM> {
-    let mut pcm: Vec<AudioPCM> = Vec::new();
+pub fn list_devices() -> Vec<PlaybackPCM> {
+    let mut pcm: Vec<PlaybackPCM> = Vec::new();
 
     let iter = Iter::new();
     for card in iter.flatten() {
@@ -67,17 +67,17 @@ pub fn list_devices() -> Vec<AudioPCM> {
             continue;
         };
 
-        let devices: Vec<AudioDevice> = DeviceIter::new(&ctl)
+        let devices: Vec<PlaybackDevice> = DeviceIter::new(&ctl)
             .filter_map(|index| {
                 let info = ctl.pcm_info(index as u32, 0, Direction::Playback).ok()?;
-                Some(AudioDevice {
+                Some(PlaybackDevice {
                     index,
                     name: info.get_name().map(|s| s.to_owned()).ok(),
                 })
             })
             .collect();
 
-        pcm.push(AudioPCM {
+        pcm.push(PlaybackPCM {
             index,
             caps,
             name: card.get_name().ok(),

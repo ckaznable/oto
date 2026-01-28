@@ -115,7 +115,7 @@ impl ProtocolLruData {
                 protocol.last_encoding_result();
                 protocol.resize_encode(&resize, area);
 
-                log::info!("resize encode done");
+                log::debug!("resize encode done");
                 Ok(ProtocolLruResult::UnCached(image, protocol))
             }
         }

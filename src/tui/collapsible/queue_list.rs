@@ -10,7 +10,11 @@ use crate::tui::{AppState, LAYOUT_WIDTH_S, collapsible::CollapsibleWidget};
 pub struct QueueList;
 
 impl CollapsibleWidget<AppState> for QueueList {
-    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+    fn title(&self) -> &'static str {
+        " Queue "
+    }
+
+    fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let playlist = state.playlist.borrow();
         let list_len = playlist.list.len();
@@ -183,7 +187,7 @@ impl CollapsibleWidget<AppState> for QueueList {
                     Style::default().fg(theme.media_artist),
                 ),
             ])
-            .style(Style::default().bg(theme.surface1))
+            .style(Style::default().bg(theme.collapse_queue_bg))
             .render(area, buf);
         }
     }

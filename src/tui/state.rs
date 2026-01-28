@@ -67,6 +67,51 @@ impl QueueState {
     }
 }
 
+#[derive(Default)]
+pub struct DevicesListState {
+    pub cursor_index: usize,
+    pub scroll_state: ScrollbarState,
+}
+
+impl DevicesListState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Move cursor by steps (positive = forward, negative = backward), returns true if cursor changed
+    pub fn move_cursor(&mut self, steps: i16, len: usize) -> bool {
+        if len == 0 {
+            return false;
+        }
+
+        let old_index = self.cursor_index;
+        let new_index = if steps >= 0 {
+            (self.cursor_index + steps as usize).min(len.saturating_sub(1))
+        } else {
+            self.cursor_index
+                .saturating_sub(steps.unsigned_abs() as usize)
+        };
+
+        if new_index != old_index {
+            self.cursor_index = new_index;
+            self.scroll_state = self.scroll_state.position(self.cursor_index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Update content length for scrollbar
+    pub fn set_content_length(&mut self, len: usize) {
+        self.scroll_state = self.scroll_state.content_length(len);
+    }
+
+    /// Get current cursor index
+    pub fn cursor(&self) -> usize {
+        self.cursor_index
+    }
+}
+
 pub struct MediaInfoState {
     pub picker: Option<Picker>,
     pub cover: Option<StatefulProtocol>,
@@ -102,6 +147,7 @@ impl MediaInfoState {
 #[derive(Default)]
 pub struct UiState {
     pub queue: QueueState,
+    pub devices: DevicesListState,
     pub media_info: MediaInfoState,
     pub cover: Option<UnCachedProtocol>,
     pub expand_index: usize,

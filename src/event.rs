@@ -1,5 +1,5 @@
 use crate::{
-    devices::AudioPCM,
+    devices::PlaybackPCM,
     media::{MediaSpec, TrackMeta},
     player::PlayList,
     tui::{AppMode, image::ProtocolLruResult},
@@ -28,11 +28,11 @@ pub enum AppCommand {
     TrackUpdate(TrackMeta, MediaSpec),
     PlaylistUpdate(PlayList),
     Rerender(bool),
-    MoveQueueCursor(i16),
+    MoveListCursor(i16),
     MoveCollapseCursor(i16),
     PickTrack,
     ImageEncodeResult(ProtocolLruResult),
-    DevicesList(Vec<AudioPCM>),
+    DevicesList(Vec<PlaybackPCM>),
     DeviceUpdate((i32, i32)),
 }
 

@@ -1,38 +1,69 @@
-use ratatui::prelude::*;
+use ratatui::{
+    prelude::*,
+    widgets::{Block, Borders},
+};
 use strum::EnumCount;
 
-use crate::tui::{AppState, collapsible::queue_list::QueueList};
+use crate::tui::{
+    AppState, collapsible::devices_list::DevicesList, collapsible::queue_list::QueueList,
+};
 
+pub mod devices_list;
 pub mod queue_list;
 
 #[derive(EnumCount, Clone, Copy)]
 pub enum CollapseWidgets {
     QueueList,
+    DevicesList,
 }
 
 impl CollapseWidgets {
     pub fn get(index: usize) -> Self {
         match index {
             0 => Self::QueueList,
+            1 => Self::DevicesList,
             _ => Self::QueueList,
         }
     }
 
     pub fn widgets<'a>() -> &'a [&'a dyn CollapsibleWidget<AppState>; Self::COUNT] {
-        &[&QueueList]
+        &[&QueueList, &DevicesList]
     }
 }
 
-pub trait CollapsibleWidget<T> {
-    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut T);
+pub trait CollapsibleWidget<T: HasTheme> {
+    fn title(&self) -> &'static str;
+    fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut T);
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut T);
 
     fn render(&self, area: Rect, buf: &mut Buffer, state: &mut T) {
         match area.height {
             0 => (),
             1 => self.render_collapse(area, buf, state),
-            _ => self.render_expand(area, buf, state),
+            _ => {
+                let theme = state.theme();
+                let block = Block::default()
+                    .title(self.title())
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(theme.border))
+                    .title_style(Style::default().fg(theme.text).bold());
+
+                let inner_area = block.inner(area);
+                block.render(area, buf);
+
+                self.render_expand_content(inner_area, buf, state);
+            }
         }
+    }
+}
+
+pub trait HasTheme {
+    fn theme(&self) -> &crate::tui::theme::Theme;
+}
+
+impl HasTheme for AppState {
+    fn theme(&self) -> &crate::tui::theme::Theme {
+        &self.theme
     }
 }
 
