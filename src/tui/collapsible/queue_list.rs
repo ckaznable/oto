@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, StatefulWidget, Table, Widget},
 };
 
-use crate::tui::{AppState, LAYOUT_WIDTH_S, collapsible::CollapsibleWidget};
+use crate::tui::{collapsible::CollapsibleWidget, AppState, LAYOUT_WIDTH_S};
 
 pub struct QueueList;
 
@@ -176,7 +176,7 @@ impl CollapsibleWidget<AppState> for QueueList {
 
         if let Some((_, track)) = playing {
             Line::from(vec![
-                Span::raw(" "),
+                Span::raw("  "),
                 Span::styled(
                     track.title.as_deref().unwrap_or_default(),
                     Style::default().fg(theme.media_title),

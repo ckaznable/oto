@@ -11,7 +11,6 @@ use std::{
 use strum::{Display, EnumCount};
 
 use ratatui::{
-    DefaultTerminal, Frame,
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent, KeyModifiers},
@@ -20,6 +19,7 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     widgets::Block,
+    DefaultTerminal, Frame,
 };
 
 use crate::{
@@ -207,20 +207,20 @@ fn app(
                 force_render = force;
             }
             AppCommand::MoveListCursor(steps) => {
-                let index= state.ui_state.borrow().expand_index;
+                let index = state.ui_state.borrow().expand_index;
                 let mut ui_state = state.ui_state.borrow_mut();
-                let render = match CollapseWidgets::get(index) {
+
+                force_render = match CollapseWidgets::get(index) {
                     CollapseWidgets::QueueList => {
                         let len = state.playlist.borrow().list.len();
                         ui_state.queue.move_cursor(steps, len)
-                    },
+                    }
                     CollapseWidgets::DevicesList => {
                         let len = state.devices.borrow().len();
                         ui_state.devices.move_cursor(steps, len)
-                    },
+                    }
+                    CollapseWidgets::KeyBinding => false,
                 };
-
-                force_render = render;
             }
             AppCommand::MoveCollapseCursor(steps) => {
                 let mut ui_state = state.ui_state.borrow_mut();

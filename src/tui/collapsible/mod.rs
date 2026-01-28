@@ -5,16 +5,19 @@ use ratatui::{
 use strum::EnumCount;
 
 use crate::tui::{
-    AppState, collapsible::devices_list::DevicesList, collapsible::queue_list::QueueList,
+    collapsible::devices_list::DevicesList, collapsible::keybinding::KeyBinding,
+    collapsible::queue_list::QueueList, AppState,
 };
 
 pub mod devices_list;
+pub mod keybinding;
 pub mod queue_list;
 
 #[derive(EnumCount, Clone, Copy)]
 pub enum CollapseWidgets {
     QueueList,
     DevicesList,
+    KeyBinding,
 }
 
 impl CollapseWidgets {
@@ -22,12 +25,13 @@ impl CollapseWidgets {
         match index {
             0 => Self::QueueList,
             1 => Self::DevicesList,
+            2 => Self::KeyBinding,
             _ => Self::QueueList,
         }
     }
 
     pub fn widgets<'a>() -> &'a [&'a dyn CollapsibleWidget<AppState>; Self::COUNT] {
-        &[&QueueList, &DevicesList]
+        &[&QueueList, &DevicesList, &KeyBinding]
     }
 }
 

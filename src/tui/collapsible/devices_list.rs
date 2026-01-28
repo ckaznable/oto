@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{List, ListItem, Scrollbar, ScrollbarOrientation, StatefulWidget, Widget},
 };
 
-use crate::tui::{AppState, collapsible::CollapsibleWidget};
+use crate::tui::{collapsible::CollapsibleWidget, AppState};
 
 pub struct DevicesList;
 
@@ -137,7 +137,7 @@ impl CollapsibleWidget<AppState> for DevicesList {
             .unwrap_or_else(|| "No Device".to_string());
 
         Line::from(vec![
-            Span::raw(" "),
+            Span::raw("  "),
             Span::styled(current_name, Style::default().fg(theme.text)),
         ])
         .style(Style::default().bg(theme.collapse_devices_bg))
