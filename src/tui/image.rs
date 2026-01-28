@@ -77,6 +77,7 @@ pub enum ProtocolLruData {
     },
 }
 
+#[allow(unused_variables)]
 impl ProtocolLruData {
     pub fn encode(self, picker: &Picker) -> Result<ProtocolLruResult> {
         match self {
@@ -214,6 +215,7 @@ pub enum LruProtocolStatus {
     Err,
 }
 
+#[allow(dead_code)]
 pub struct LruProtocol {
     tx: Sender<ProtocolLruData>,
     status: LruProtocolStatus,
