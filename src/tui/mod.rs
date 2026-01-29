@@ -192,11 +192,17 @@ fn app(
                     execute!(stdout(), SetTitle(format!(" {title}"))).ok();
                 }
 
+                let mut playing = state.playing_track.borrow_mut();
                 let mut ui_state = state.ui_state.borrow_mut();
-                let protocol = lru_protocol_factory.new_uncached_protocol(track.path());
-                ui_state.cover.replace(protocol);
+                let track_path = track.path();
 
-                *state.playing_track.borrow_mut() = PlayingTrack { track, spec };
+                if !playing.track.is_album_same(&track) {
+                    log::debug!("update cover image");
+                    let protocol = lru_protocol_factory.new_uncached_protocol(track_path);
+                    ui_state.cover.replace(protocol);
+                }
+
+                *playing = PlayingTrack { track, spec };
                 force_render = true;
             }
             AppCommand::PlaylistUpdate(list) => {

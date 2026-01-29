@@ -28,7 +28,7 @@ pub enum OutputMode {
     DSD,
 }
 
-#[derive(Clone, Default, Debug, Encode, Decode)]
+#[derive(Clone, Default, Debug, Encode, Decode, PartialEq, Eq)]
 pub struct Album {
     pub name: Option<String>,
     pub year: Option<u32>,
@@ -66,6 +66,12 @@ impl TrackMeta {
 
     pub fn cover(&self) -> Option<Vec<u8>> {
         cover_from_path(&self.path())
+    }
+
+    pub fn is_album_same(&self, other: &Self) -> bool {
+        self.artist == other.artist
+            && self.album.name == other.album.name
+            && self.album.year == other.album.year
     }
 }
 
