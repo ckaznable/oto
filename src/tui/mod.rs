@@ -11,6 +11,7 @@ use std::{
 use strum::{Display, EnumCount};
 
 use ratatui::{
+    DefaultTerminal, Frame,
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent, KeyModifiers},
@@ -19,7 +20,6 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     widgets::Block,
-    DefaultTerminal, Frame,
 };
 
 use crate::{
@@ -256,7 +256,11 @@ fn app(
                         for card in list {
                             tmp += card.devices.len();
                             if tmp > index {
-                                d = Some((card.index, card.devices[card.devices.len().saturating_sub(tmp - index)].index));
+                                d = Some((
+                                    card.index,
+                                    card.devices[card.devices.len().saturating_sub(tmp - index)]
+                                        .index,
+                                ));
                                 break;
                             }
                         }
@@ -325,7 +329,8 @@ fn render(frame: &mut Frame, mut state: AppState) {
 
     if area.width > LAYOUT_WIDTH_S {
         let index = state.ui_state.borrow().expand_index;
-        let groups: CollapsibleWidgetGroup<{ CollapseWidgets::COUNT }> = CollapsibleWidgetGroup::new(CollapseWidgets::widgets(), index);
+        let groups: CollapsibleWidgetGroup<{ CollapseWidgets::COUNT }> =
+            CollapsibleWidgetGroup::new(CollapseWidgets::widgets(), index, 1);
         frame.render_stateful_widget(groups, main, &mut state);
     }
 

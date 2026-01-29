@@ -12,6 +12,7 @@ use crate::tui::{
 pub mod devices_list;
 pub mod keybinding;
 pub mod queue_list;
+pub mod tracks_picker;
 
 #[derive(EnumCount, Clone, Copy)]
 pub enum CollapseWidgets {
@@ -74,12 +75,21 @@ impl HasTheme for AppState {
 pub struct CollapsibleWidgetGroup<'a, const N: usize> {
     widgets: &'a [&'a dyn CollapsibleWidget<AppState>],
     index: usize,
+    collapse_size: u16,
 }
 
 impl<'a, const N: usize> CollapsibleWidgetGroup<'a, N> {
-    pub fn new(widgets: &'a [&'a dyn CollapsibleWidget<AppState>], index: usize) -> Self {
+    pub fn new(
+        widgets: &'a [&'a dyn CollapsibleWidget<AppState>],
+        index: usize,
+        collapse_size: u16,
+    ) -> Self {
         assert_eq!(widgets.len(), N, "Widgets count must match N");
-        Self { widgets, index }
+        Self {
+            widgets,
+            index,
+            collapse_size,
+        }
     }
 }
 
@@ -87,9 +97,15 @@ impl<'a, const N: usize> StatefulWidget for CollapsibleWidgetGroup<'a, N> {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let fill_len = area.height.saturating_sub((N as u16).saturating_sub(1));
+        let fill_len = area.height.saturating_sub((N as u16).saturating_sub(self.collapse_size * N as u16));
 
-        let lengths: [u16; N] = std::array::from_fn(|i| if i == self.index { fill_len } else { 1 });
+        let lengths: [u16; N] = std::array::from_fn(|i| {
+            if i == self.index {
+                fill_len
+            } else {
+                self.collapse_size
+            }
+        });
 
         let constraints = lengths.map(Constraint::Length);
 

@@ -5,7 +5,7 @@ use image::ImageReader;
 use ratatui::widgets::ScrollbarState;
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 
-use crate::tui::image::UnCachedProtocol;
+use crate::{media::TracksTree, tui::image::UnCachedProtocol};
 
 #[derive(Default)]
 pub struct QueueState {
@@ -145,10 +145,24 @@ impl MediaInfoState {
 }
 
 #[derive(Default)]
+pub struct TracksState {
+    pub tree: TracksTree,
+    pub playlist: Vec<usize>,
+    pub artist_index: usize,
+    pub album_inedx: usize,
+    pub track_index: usize,
+    pub expand_index: usize,
+    pub artist_scroll: ScrollbarState,
+    pub album_scroll: ScrollbarState,
+    pub track_scroll: ScrollbarState,
+}
+
+#[derive(Default)]
 pub struct UiState {
     pub queue: QueueState,
     pub devices: DevicesListState,
     pub media_info: MediaInfoState,
     pub cover: Option<UnCachedProtocol>,
+    pub tracks: TracksState,
     pub expand_index: usize,
 }
