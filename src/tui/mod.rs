@@ -324,7 +324,9 @@ fn render(frame: &mut Frame, mut state: AppState) {
     let [media_info, main] = layout.areas(content);
 
     if area.width > LAYOUT_WIDTH_S {
-        frame.render_stateful_widget(CollapsibleWidgetGroup, main, &mut state);
+        let index = state.ui_state.borrow().expand_index;
+        let groups: CollapsibleWidgetGroup<{ CollapseWidgets::COUNT }> = CollapsibleWidgetGroup::new(CollapseWidgets::widgets(), index);
+        frame.render_stateful_widget(groups, main, &mut state);
     }
 
     frame.render_stateful_widget(MediaInfo, media_info, &mut state);

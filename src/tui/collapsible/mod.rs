@@ -5,8 +5,8 @@ use ratatui::{
 use strum::EnumCount;
 
 use crate::tui::{
-    collapsible::devices_list::DevicesList, collapsible::keybinding::KeyBinding,
-    collapsible::queue_list::QueueList, AppState,
+    AppState, collapsible::devices_list::DevicesList, collapsible::keybinding::KeyBinding,
+    collapsible::queue_list::QueueList,
 };
 
 pub mod devices_list;
@@ -71,25 +71,32 @@ impl HasTheme for AppState {
     }
 }
 
-pub struct CollapsibleWidgetGroup;
+pub struct CollapsibleWidgetGroup<'a, const N: usize> {
+    widgets: &'a [&'a dyn CollapsibleWidget<AppState>],
+    index: usize,
+}
 
-impl StatefulWidget for CollapsibleWidgetGroup {
+impl<'a, const N: usize> CollapsibleWidgetGroup<'a, N> {
+    pub fn new(widgets: &'a [&'a dyn CollapsibleWidget<AppState>], index: usize) -> Self {
+        assert_eq!(widgets.len(), N, "Widgets count must match N");
+        Self { widgets, index }
+    }
+}
+
+impl<'a, const N: usize> StatefulWidget for CollapsibleWidgetGroup<'a, N> {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        const WIDGETS_NUM: usize = CollapseWidgets::COUNT;
+        let fill_len = area.height.saturating_sub((N as u16).saturating_sub(1));
 
-        let index = state.ui_state.borrow().expand_index;
+        let lengths: [u16; N] = std::array::from_fn(|i| if i == self.index { fill_len } else { 1 });
 
-        let fill_len = area.height - WIDGETS_NUM.saturating_sub(WIDGETS_NUM - 1) as u16;
+        let constraints = lengths.map(Constraint::Length);
 
-        let constraint: [u16; WIDGETS_NUM] =
-            std::array::from_fn(|i| if i == index { fill_len } else { 1 });
-
-        let layout = Layout::vertical(Constraint::from_lengths(constraint));
+        let layout = Layout::vertical(constraints);
         let areas = layout.split(area);
-        let widgets = CollapseWidgets::widgets();
-        widgets.iter().enumerate().for_each(|(i, w)| {
+
+        self.widgets.iter().enumerate().for_each(|(i, w)| {
             w.render(areas[i], buf, state);
         });
     }
