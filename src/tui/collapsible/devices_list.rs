@@ -46,51 +46,52 @@ impl CollapsibleWidget<AppState> for DevicesList {
 
         let cursor_index = state.ui_state.borrow().devices.cursor_index;
 
-        let items: Vec<ListItem> = flat_list
-            .iter()
-            .enumerate()
-            .map(|(index, (pcm_idx, dev_idx, name))| {
-                let is_current = *pcm_idx == current_device.0 && *dev_idx == current_device.1;
-                let is_cursor = index == cursor_index;
-
-                let bg_color = if is_cursor {
-                    theme.surface1
-                } else if is_current {
-                    theme.queue_current_bg
-                } else {
-                    theme.base
-                };
-
-                let indicator = if is_current { ">" } else { " " };
-
-                let line = Line::from(vec![
-                    Span::styled(
-                        format!("{indicator} "),
-                        Style::default().fg(theme.mode_playing_fg),
-                    ),
-                    Span::styled(name.clone(), Style::default().fg(theme.queue_title)),
-                ]);
-
-                ListItem::new(line).style(Style::default().bg(bg_color))
-            })
-            .collect();
-
-        drop(devices);
-
         let layout = Layout::horizontal([Constraint::Fill(1), Constraint::Length(1)]);
         let [list_area, scrollbar_area] = layout.areas(area);
 
         let visible_height = list_area.height as usize;
         let offset = calculate_scroll_offset(cursor_index, visible_height, list_len);
 
-        let visible_items: Vec<ListItem> = items
-            .into_iter()
-            .skip(offset)
-            .take(visible_height)
-            .collect();
+        state.ui_state.borrow_mut().cache.list_items.clear();
 
-        let list = List::new(visible_items);
+        let list_iter = flat_list
+            .iter()
+            .enumerate()
+            .skip(offset)
+            .take(visible_height);
+
+        for (index, (pcm_idx, dev_idx, name)) in list_iter {
+            let is_current = *pcm_idx == current_device.0 && *dev_idx == current_device.1;
+            let is_cursor = index == cursor_index;
+
+            let bg_color = if is_cursor {
+                theme.surface1
+            } else if is_current {
+                theme.queue_current_bg
+            } else {
+                theme.base
+            };
+
+            let indicator = if is_current { ">" } else { " " };
+
+            let line = Line::from(vec![
+                Span::styled(
+                    format!("{indicator} "),
+                    Style::default().fg(theme.mode_playing_fg),
+                ),
+                Span::styled(name.clone(), Style::default().fg(theme.queue_title)),
+            ]);
+
+            let item = ListItem::new(line).style(Style::default().bg(bg_color));
+            state.ui_state.borrow_mut().cache.list_items.push(item);
+        }
+
+        drop(devices);
+
+        let mut ui_state = state.ui_state.borrow_mut();
+        let list = List::new(ui_state.cache.list_items.drain(..));
         Widget::render(list, list_area, buf);
+        drop(ui_state);
 
         let mut scroll_state = state.ui_state.borrow().devices.scroll_state;
         scroll_state = scroll_state.position(cursor_index);
