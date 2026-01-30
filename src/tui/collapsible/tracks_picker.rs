@@ -82,10 +82,11 @@ impl CollapsibleWidget<AppState> for TracksPicker {
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let playing_track = state.playing_track.borrow();
-        let artist_name = playing_track.track.artist.as_deref().unwrap_or("No Artist");
+        let artist_name = playing_track.track.artist.as_deref().unwrap_or("Unknown");
+        let album_name = playing_track.track.album.name.as_deref().unwrap_or("Unknown");
 
         Line::from(Span::styled(
-            artist_name,
+            format!(" 󰠃 {artist_name} 󰎆  {album_name}"),
             Style::default().fg(theme.media_artist),
         ))
         .style(Style::default().bg(theme.collapse_queue_bg))
