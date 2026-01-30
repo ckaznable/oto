@@ -7,9 +7,10 @@ use ratatui::{
     },
 };
 
+use crate::media::TracksTree;
 use crate::tui::{
-    collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
     AppState,
+    collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
 };
 
 pub struct TracksPicker;
@@ -223,8 +224,6 @@ fn render_list_with_scrollbar(
     );
     scroll_state
 }
-
-use crate::media::TracksTree;
 
 fn get_unique_albums(tree: &TracksTree, artist_index: usize) -> Vec<String> {
     tree.get(artist_index)
