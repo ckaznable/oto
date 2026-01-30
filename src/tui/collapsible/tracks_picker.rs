@@ -9,7 +9,6 @@ use ratatui::{
 
 use crate::tui::{
     collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
-    theme::Theme,
     AppState,
 };
 
@@ -30,7 +29,7 @@ impl CollapsibleWidget<AppState> for TracksPicker {
         let expand_index = state.ui_state.borrow().tracks.expand_index;
         let widgets: &[&dyn CollapsibleWidget<AppState>; LAYERS_NUM] =
             &[&ArtistList, &AlbumList, &TrackList];
-        let group = CollapsibleWidgetGroup::<LAYERS_NUM>::new(widgets, expand_index, 1);
+        let group = CollapsibleWidgetGroup::<LAYERS_NUM>::new(widgets, expand_index, 5);
         StatefulWidget::render(group, area, buf, state);
     }
 
@@ -68,7 +67,7 @@ impl CollapsibleWidget<AppState> for ArtistList {
         let new_scroll = render_list_with_scrollbar(
             area,
             buf,
-            &state.theme,
+            state,
             &items,
             cursor_index,
             state.theme.media_artist,
@@ -97,7 +96,7 @@ impl CollapsibleWidget<AppState> for AlbumList {
         let new_scroll = render_list_with_scrollbar(
             area,
             buf,
-            &state.theme,
+            state,
             &items,
             cursor_index,
             state.theme.queue_album,
@@ -118,15 +117,10 @@ impl CollapsibleWidget<AppState> for TrackList {
 
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let ui_state = state.ui_state.borrow();
-        let albums = get_unique_albums(&ui_state.tracks.tree, ui_state.tracks.artist_index);
-        let selected_album = albums
-            .get(ui_state.tracks.album_inedx)
-            .map(|s| s.as_str())
-            .unwrap_or("");
         let track_indices = get_track_indices(
             &ui_state.tracks.tree,
             ui_state.tracks.artist_index,
-            selected_album,
+            ui_state.tracks.album_inedx,
         );
         let cursor_index = ui_state.tracks.track_index;
         let scroll_state = ui_state.tracks.track_scroll;
@@ -148,7 +142,7 @@ impl CollapsibleWidget<AppState> for TrackList {
         let new_scroll = render_list_with_scrollbar(
             area,
             buf,
-            &state.theme,
+            state,
             &items,
             cursor_index,
             state.theme.queue_title,
@@ -165,49 +159,52 @@ impl CollapsibleWidget<AppState> for TrackList {
 fn render_list_with_scrollbar(
     area: Rect,
     buf: &mut Buffer,
-    theme: &Theme,
+    state: &mut AppState,
     items: &[String],
     cursor_index: usize,
     text_color: Color,
     mut scroll_state: ScrollbarState,
 ) -> ScrollbarState {
-    let list_items: Vec<ListItem> = items
-        .iter()
-        .enumerate()
-        .map(|(idx, text)| {
-            let is_cursor = idx == cursor_index;
-            let bg_color = if is_cursor {
-                theme.surface1
-            } else {
-                theme.base
-            };
-            let indicator = if is_cursor { ">" } else { " " };
-
-            let line = Line::from(vec![
-                Span::styled(
-                    format!("{indicator} "),
-                    Style::default().fg(theme.mode_playing_fg),
-                ),
-                Span::styled(text.clone(), Style::default().fg(text_color)),
-            ]);
-
-            ListItem::new(line).style(Style::default().bg(bg_color))
-        })
-        .collect();
-
+    let theme = &state.theme;
     let layout = Layout::horizontal([Constraint::Fill(1), Constraint::Length(1)]);
     let [list_area, scrollbar_area] = layout.areas(area);
 
     let visible_height = list_area.height as usize;
-    let list_len = list_items.len();
+    let list_len = items.len();
     let offset = calculate_scroll_offset(cursor_index, visible_height, list_len);
 
-    let visible_items: Vec<ListItem> = list_items
-        .into_iter()
-        .skip(offset)
-        .take(visible_height)
-        .collect();
-    Widget::render(List::new(visible_items), list_area, buf);
+    state.ui_state.borrow_mut().cache.list_items.clear();
+
+    let list_iter = items.iter().enumerate().skip(offset).take(visible_height);
+
+    for (idx, text) in list_iter {
+        let is_cursor = idx == cursor_index;
+        let bg_color = if is_cursor {
+            theme.surface1
+        } else {
+            theme.base
+        };
+        let indicator = if is_cursor { ">" } else { " " };
+
+        let line = Line::from(vec![
+            Span::styled(
+                format!("{indicator} "),
+                Style::default().fg(theme.mode_playing_fg),
+            ),
+            Span::styled(text.clone(), Style::default().fg(text_color)),
+        ]);
+
+        let item = ListItem::new(line).style(Style::default().bg(bg_color));
+        state.ui_state.borrow_mut().cache.list_items.push(item);
+    }
+
+    let mut ui_state = state.ui_state.borrow_mut();
+    Widget::render(
+        List::new(ui_state.cache.list_items.drain(..)),
+        list_area,
+        buf,
+    );
+    drop(ui_state);
 
     scroll_state = scroll_state.content_length(list_len).position(cursor_index);
 
@@ -227,30 +224,18 @@ fn render_list_with_scrollbar(
     scroll_state
 }
 
-type TracksTree = Vec<(String, Vec<(String, usize)>)>;
+use crate::media::TracksTree;
 
 fn get_unique_albums(tree: &TracksTree, artist_index: usize) -> Vec<String> {
     tree.get(artist_index)
-        .map(|(_, albums)| {
-            albums
-                .iter()
-                .map(|(name, _)| name.clone())
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect()
-        })
+        .map(|(_, albums)| albums.iter().map(|(name, _)| name.clone()).collect())
         .unwrap_or_default()
 }
 
-fn get_track_indices(tree: &TracksTree, artist_index: usize, album_name: &str) -> Vec<usize> {
+fn get_track_indices(tree: &TracksTree, artist_index: usize, album_index: usize) -> Vec<usize> {
     tree.get(artist_index)
-        .map(|(_, albums)| {
-            albums
-                .iter()
-                .filter(|(name, _)| name == album_name)
-                .map(|(_, idx)| *idx)
-                .collect()
-        })
+        .and_then(|(_, albums)| albums.get(album_index))
+        .map(|(_, indices)| indices.clone())
         .unwrap_or_default()
 }
 

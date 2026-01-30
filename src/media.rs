@@ -19,8 +19,8 @@ use bitcode::{Decode, Encode};
 use crate::{decoder::DsfReader, shared::PROJ_DIRS, util::cover_from_path};
 
 pub type Tracks = Vec<TrackMeta>;
-/// artist, ( album name, index of playlist )
-pub type TracksTree = Vec<(String, Vec<(String, usize)>)>;
+/// artist, ( album name, indexes of playlist )
+pub type TracksTree = Vec<(String, Vec<(String, Vec<usize>)>)>;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Encode, Decode)]
@@ -106,7 +106,7 @@ impl MediaStore {
     pub fn get_tracks_tree(tracks: &[TrackMeta]) -> TracksTree {
         use std::collections::HashMap;
 
-        let mut artist_map: HashMap<String, Vec<(String, usize)>> = HashMap::new();
+        let mut artist_map: HashMap<String, HashMap<String, Vec<usize>>> = HashMap::new();
 
         for (idx, track) in tracks.iter().enumerate() {
             let Some(artist) = track.artist.as_ref() else {
@@ -119,10 +119,15 @@ impl MediaStore {
             artist_map
                 .entry(artist.clone())
                 .or_default()
-                .push((album_name.clone(), idx));
+                .entry(album_name.clone())
+                .or_default()
+                .push(idx);
         }
 
-        artist_map.into_iter().collect()
+        artist_map
+            .into_iter()
+            .map(|(artist, albums)| (artist, albums.into_iter().collect()))
+            .collect()
     }
 
     pub fn tracks_file_path() -> PathBuf {

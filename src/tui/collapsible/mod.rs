@@ -5,8 +5,11 @@ use ratatui::{
 use strum::EnumCount;
 
 use crate::tui::{
-    AppState, collapsible::devices_list::DevicesList, collapsible::keybinding::KeyBinding,
-    collapsible::queue_list::QueueList,
+    collapsible::{
+        devices_list::DevicesList, keybinding::KeyBinding, queue_list::QueueList,
+        tracks_picker::TracksPicker,
+    },
+    AppState,
 };
 
 pub mod devices_list;
@@ -17,6 +20,7 @@ pub mod tracks_picker;
 #[derive(EnumCount, Clone, Copy)]
 pub enum CollapseWidgets {
     QueueList,
+    TrackPicker,
     DevicesList,
     KeyBinding,
 }
@@ -25,14 +29,15 @@ impl CollapseWidgets {
     pub fn get(index: usize) -> Self {
         match index {
             0 => Self::QueueList,
-            1 => Self::DevicesList,
-            2 => Self::KeyBinding,
+            1 => Self::TrackPicker,
+            2 => Self::DevicesList,
+            3 => Self::KeyBinding,
             _ => Self::QueueList,
         }
     }
 
     pub fn widgets<'a>() -> &'a [&'a dyn CollapsibleWidget<AppState>; Self::COUNT] {
-        &[&QueueList, &DevicesList, &KeyBinding]
+        &[&QueueList, &TracksPicker, &DevicesList, &KeyBinding]
     }
 }
 
@@ -97,7 +102,9 @@ impl<'a, const N: usize> StatefulWidget for CollapsibleWidgetGroup<'a, N> {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let fill_len = area.height.saturating_sub((N as u16).saturating_sub(self.collapse_size * N as u16));
+        let fill_len = area
+            .height
+            .saturating_sub((N as u16).saturating_sub(self.collapse_size * N as u16));
 
         let lengths: [u16; N] = std::array::from_fn(|i| {
             if i == self.index {

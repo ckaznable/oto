@@ -2,10 +2,43 @@ use std::io::Cursor;
 
 use anyhow::Result;
 use image::ImageReader;
-use ratatui::widgets::ScrollbarState;
+use ratatui::widgets::{ListItem, Row, ScrollbarState};
+
+#[derive(Default)]
+pub struct CacheState {
+    pub rows: Vec<Row<'static>>,
+    pub list_items: Vec<ListItem<'static>>,
+}
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 
 use crate::{media::TracksTree, tui::image::UnCachedProtocol};
+
+pub trait CursorMovable {
+    fn cursor_index(&self) -> usize;
+    fn set_cursor_index(&mut self, index: usize);
+    fn set_scroll_position(&mut self, position: usize);
+
+    fn move_cursor(&mut self, steps: i16, len: usize) -> bool {
+        if len == 0 {
+            return false;
+        }
+
+        let old_index = self.cursor_index();
+        let new_index = if steps >= 0 {
+            (old_index + steps as usize).min(len.saturating_sub(1))
+        } else {
+            old_index.saturating_sub(steps.unsigned_abs() as usize)
+        };
+
+        if new_index != old_index {
+            self.set_cursor_index(new_index);
+            self.set_scroll_position(new_index);
+            true
+        } else {
+            false
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct QueueState {
@@ -14,32 +47,23 @@ pub struct QueueState {
     pub scroll_state: ScrollbarState,
 }
 
+impl CursorMovable for QueueState {
+    fn cursor_index(&self) -> usize {
+        self.cursor_index
+    }
+
+    fn set_cursor_index(&mut self, index: usize) {
+        self.cursor_index = index;
+    }
+
+    fn set_scroll_position(&mut self, position: usize) {
+        self.scroll_state = self.scroll_state.position(position);
+    }
+}
+
 impl QueueState {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Move cursor by steps (positive = forward, negative = backward), returns true if cursor changed
-    pub fn move_cursor(&mut self, steps: i16, len: usize) -> bool {
-        if len == 0 {
-            return false;
-        }
-
-        let old_index = self.cursor_index;
-        let new_index = if steps >= 0 {
-            (self.cursor_index + steps as usize).min(len.saturating_sub(1))
-        } else {
-            self.cursor_index
-                .saturating_sub(steps.unsigned_abs() as usize)
-        };
-
-        if new_index != old_index {
-            self.cursor_index = new_index;
-            self.scroll_state = self.scroll_state.position(self.cursor_index);
-            true
-        } else {
-            false
-        }
     }
 
     /// Set the playing index and optionally sync cursor to it
@@ -73,32 +97,23 @@ pub struct DevicesListState {
     pub scroll_state: ScrollbarState,
 }
 
+impl CursorMovable for DevicesListState {
+    fn cursor_index(&self) -> usize {
+        self.cursor_index
+    }
+
+    fn set_cursor_index(&mut self, index: usize) {
+        self.cursor_index = index;
+    }
+
+    fn set_scroll_position(&mut self, position: usize) {
+        self.scroll_state = self.scroll_state.position(position);
+    }
+}
+
 impl DevicesListState {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Move cursor by steps (positive = forward, negative = backward), returns true if cursor changed
-    pub fn move_cursor(&mut self, steps: i16, len: usize) -> bool {
-        if len == 0 {
-            return false;
-        }
-
-        let old_index = self.cursor_index;
-        let new_index = if steps >= 0 {
-            (self.cursor_index + steps as usize).min(len.saturating_sub(1))
-        } else {
-            self.cursor_index
-                .saturating_sub(steps.unsigned_abs() as usize)
-        };
-
-        if new_index != old_index {
-            self.cursor_index = new_index;
-            self.scroll_state = self.scroll_state.position(self.cursor_index);
-            true
-        } else {
-            false
-        }
     }
 
     /// Update content length for scrollbar
@@ -157,6 +172,51 @@ pub struct TracksState {
     pub track_scroll: ScrollbarState,
 }
 
+impl CursorMovable for TracksState {
+    fn cursor_index(&self) -> usize {
+        match self.expand_index {
+            0 => self.artist_index,
+            1 => self.album_inedx,
+            _ => self.track_index,
+        }
+    }
+
+    fn set_cursor_index(&mut self, index: usize) {
+        match self.expand_index {
+            0 => self.artist_index = index,
+            1 => self.album_inedx = index,
+            _ => self.track_index = index,
+        }
+    }
+
+    fn set_scroll_position(&mut self, position: usize) {
+        match self.expand_index {
+            0 => self.artist_scroll = self.artist_scroll.position(position),
+            1 => self.album_scroll = self.album_scroll.position(position),
+            _ => self.track_scroll = self.track_scroll.position(position),
+        }
+    }
+}
+
+impl TracksState {
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> Option<usize> {
+        let len = match self.expand_index {
+            0 => self.tree.len(),
+            1 => self.tree.get(self.artist_index)?.1.len(),
+            _ => self
+                .tree
+                .get(self.artist_index)?
+                .1
+                .get(self.album_inedx)?
+                .1
+                .len(),
+        };
+
+        Some(len)
+    }
+}
+
 #[derive(Default)]
 pub struct UiState {
     pub queue: QueueState,
@@ -165,4 +225,5 @@ pub struct UiState {
     pub cover: Option<UnCachedProtocol>,
     pub tracks: TracksState,
     pub expand_index: usize,
+    pub cache: CacheState,
 }

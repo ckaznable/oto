@@ -31,6 +31,7 @@ pub enum AppCommand {
     Rerender(bool),
     MoveListCursor(i16),
     MoveCollapseCursor(i16),
+    MoveSubCollapseCursor(i16),
     SelectItem,
     ImageEncodeResult(ProtocolLruResult),
     DevicesList(Vec<PlaybackPCM>),

@@ -1,3 +1,4 @@
+use crate::{media::MediaStore, tui::state::CursorMovable};
 use anyhow::anyhow;
 use enclose::enclose;
 use ratatui_image::picker::Picker;
@@ -206,6 +207,7 @@ fn app(
                 force_render = true;
             }
             AppCommand::PlaylistUpdate(list) => {
+                state.ui_state.borrow_mut().tracks.tree = MediaStore::get_tracks_tree(&list.list);
                 *state.playlist.borrow_mut() = list;
                 force_render = true;
             }
@@ -220,6 +222,13 @@ fn app(
                     CollapseWidgets::QueueList => {
                         let len = state.playlist.borrow().list.len();
                         ui_state.queue.move_cursor(steps, len)
+                    }
+                    CollapseWidgets::TrackPicker => {
+                        if let Some(len) = ui_state.tracks.len() {
+                            ui_state.tracks.move_cursor(steps, len)
+                        } else {
+                            false
+                        }
                     }
                     CollapseWidgets::DevicesList => {
                         let len = state.devices.borrow().len();
@@ -238,6 +247,21 @@ fn app(
                     index.saturating_sub(steps.unsigned_abs() as usize)
                 }
                 .clamp(0, CollapseWidgets::COUNT - 1)
+            }
+            AppCommand::MoveSubCollapseCursor(steps) => {
+                let mut ui_state = state.ui_state.borrow_mut();
+                let index = ui_state.expand_index;
+
+                if matches!(CollapseWidgets::get(index), CollapseWidgets::TrackPicker) {
+                    force_render = true;
+                    if steps > 0 {
+                        ui_state.tracks.expand_index =
+                            ui_state.tracks.expand_index.saturating_add(1).clamp(0, 2);
+                    } else {
+                        ui_state.tracks.expand_index =
+                            ui_state.tracks.expand_index.saturating_sub(1).clamp(0, 2);
+                    }
+                }
             }
             AppCommand::SelectItem => {
                 let ui_state = state.ui_state.borrow();
@@ -399,10 +423,22 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     code: KeyCode::Char('l'),
                     ..
                 } => {
-                    player_tx.send(PlayerCommand::NextSong).ok();
+                    tx.send(AppCommand::MoveSubCollapseCursor(1)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('h'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveSubCollapseCursor(-1)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('L'),
+                    ..
+                } => {
+                    player_tx.send(PlayerCommand::NextSong).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('H'),
                     ..
                 } => {
                     player_tx.send(PlayerCommand::PrevSong).ok();
