@@ -119,7 +119,7 @@ impl PcmDecoder {
         let track = format
             .tracks()
             .iter()
-            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL && t.codec_params.sample_rate.is_some())
             .ok_or(anyhow!("no supported audio tracks"))?;
 
         // Use the default options for the decoder.
