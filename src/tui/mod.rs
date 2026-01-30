@@ -12,6 +12,7 @@ use std::{
 use strum::{Display, EnumCount};
 
 use ratatui::{
+    DefaultTerminal, Frame,
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent, KeyModifiers},
@@ -20,7 +21,6 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     widgets::Block,
-    DefaultTerminal, Frame,
 };
 
 use crate::{

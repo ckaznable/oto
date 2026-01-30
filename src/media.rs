@@ -112,15 +112,21 @@ impl MediaStore {
         let mut album_map: HashMap<Rc<String>, HashMap<Rc<String>, Vec<usize>>> = HashMap::new();
 
         for (idx, track) in tracks.iter().enumerate() {
-            let Some(artist) = track.artist.as_ref() else {
-                continue;
-            };
-            let Some(album_name) = track.album.name.as_ref() else {
-                continue;
-            };
-
-            let artist = Rc::new(artist.clone());
-            let album_name = Rc::new(album_name.clone());
+            let artist = Rc::new(
+                track
+                    .artist
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| "Unknown".to_string()),
+            );
+            let album_name = Rc::new(
+                track
+                    .album
+                    .name
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| "Unknown".to_string()),
+            );
 
             artist_map
                 .entry(artist.clone())
