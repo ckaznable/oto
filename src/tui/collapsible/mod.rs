@@ -5,11 +5,13 @@ use ratatui::{
 use strum::EnumCount;
 
 use crate::tui::{
+    AppState,
     collapsible::{
-        devices_list::DevicesList, keybinding::KeyBinding, queue_list::QueueList,
+        devices_list::DevicesList,
+        keybinding::KeyBinding,
+        queue_list::QueueList,
         tracks_picker::TracksPicker,
     },
-    AppState,
 };
 
 pub mod devices_list;

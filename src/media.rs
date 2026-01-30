@@ -11,6 +11,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
+    rc::Rc,
 };
 use walkdir::WalkDir;
 
@@ -20,7 +21,8 @@ use crate::{decoder::DsfReader, shared::PROJ_DIRS, util::cover_from_path};
 
 pub type Tracks = Vec<TrackMeta>;
 /// artist, ( album name, indexes of playlist )
-pub type TracksTree = Vec<(String, Vec<(String, Vec<usize>)>)>;
+/// or album name, ( artist, indexes of playlist )
+pub type TracksTree = Vec<(Rc<String>, Vec<(Rc<String>, Vec<usize>)>)>;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Encode, Decode)]
@@ -103,10 +105,11 @@ impl MediaStore {
         }
     }
 
-    pub fn get_tracks_tree(tracks: &[TrackMeta]) -> TracksTree {
+    pub fn get_tracks_tree(tracks: &[TrackMeta]) -> (TracksTree, TracksTree) {
         use std::collections::HashMap;
 
-        let mut artist_map: HashMap<String, HashMap<String, Vec<usize>>> = HashMap::new();
+        let mut artist_map: HashMap<Rc<String>, HashMap<Rc<String>, Vec<usize>>> = HashMap::new();
+        let mut album_map: HashMap<Rc<String>, HashMap<Rc<String>, Vec<usize>>> = HashMap::new();
 
         for (idx, track) in tracks.iter().enumerate() {
             let Some(artist) = track.artist.as_ref() else {
@@ -116,18 +119,34 @@ impl MediaStore {
                 continue;
             };
 
+            let artist = Rc::new(artist.clone());
+            let album_name = Rc::new(album_name.clone());
+
             artist_map
                 .entry(artist.clone())
                 .or_default()
                 .entry(album_name.clone())
                 .or_default()
                 .push(idx);
+
+            album_map
+                .entry(artist)
+                .or_default()
+                .entry(album_name)
+                .or_default()
+                .push(idx);
         }
 
-        artist_map
-            .into_iter()
-            .map(|(artist, albums)| (artist, albums.into_iter().collect()))
-            .collect()
+        (
+            artist_map
+                .into_iter()
+                .map(|(artist, albums)| (artist, albums.into_iter().collect()))
+                .collect(),
+            album_map
+                .into_iter()
+                .map(|(albums, artist)| (albums, artist.into_iter().collect()))
+                .collect(),
+        )
     }
 
     pub fn tracks_file_path() -> PathBuf {

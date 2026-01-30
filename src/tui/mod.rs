@@ -207,7 +207,8 @@ fn app(
                 force_render = true;
             }
             AppCommand::PlaylistUpdate(list) => {
-                state.ui_state.borrow_mut().tracks.tree = MediaStore::get_tracks_tree(&list.list);
+                let (by_artist, by_album) = MediaStore::get_tracks_tree(&list.list);
+                state.ui_state.borrow_mut().tracks.tree = by_artist;
                 *state.playlist.borrow_mut() = list;
                 force_render = true;
             }

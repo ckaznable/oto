@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ratatui::{
     layout::{Constraint, Layout, Margin},
     prelude::*,
@@ -9,8 +11,8 @@ use ratatui::{
 
 use crate::media::TracksTree;
 use crate::tui::{
-    AppState,
     collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
+    AppState,
 };
 
 pub struct TracksPicker;
@@ -55,7 +57,7 @@ impl CollapsibleWidget<AppState> for ArtistList {
 
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let ui_state = state.ui_state.borrow();
-        let items: Vec<String> = ui_state
+        let items: Vec<Rc<String>> = ui_state
             .tracks
             .tree
             .iter()
@@ -157,15 +159,19 @@ impl CollapsibleWidget<AppState> for TrackList {
     }
 }
 
-fn render_list_with_scrollbar(
+fn render_list_with_scrollbar<T>(
     area: Rect,
     buf: &mut Buffer,
     state: &mut AppState,
-    items: &[String],
+    items: &[T],
     cursor_index: usize,
     text_color: Color,
     mut scroll_state: ScrollbarState,
-) -> ScrollbarState {
+) -> ScrollbarState
+where
+    T: std::ops::Deref,
+    <T as std::ops::Deref>::Target: AsRef<str>,
+{
     let theme = &state.theme;
     let layout = Layout::horizontal([Constraint::Fill(1), Constraint::Length(1)]);
     let [list_area, scrollbar_area] = layout.areas(area);
@@ -192,7 +198,7 @@ fn render_list_with_scrollbar(
                 format!("{indicator} "),
                 Style::default().fg(theme.mode_playing_fg),
             ),
-            Span::styled(text.clone(), Style::default().fg(text_color)),
+            Span::styled((*text).as_ref().to_owned(), Style::default().fg(text_color)),
         ]);
 
         let item = ListItem::new(line).style(Style::default().bg(bg_color));
@@ -225,7 +231,7 @@ fn render_list_with_scrollbar(
     scroll_state
 }
 
-fn get_unique_albums(tree: &TracksTree, artist_index: usize) -> Vec<String> {
+fn get_unique_albums(tree: &TracksTree, artist_index: usize) -> Vec<Rc<String>> {
     tree.get(artist_index)
         .map(|(_, albums)| albums.iter().map(|(name, _)| name.clone()).collect())
         .unwrap_or_default()
