@@ -12,7 +12,6 @@ use std::{
 use strum::{Display, EnumCount};
 
 use ratatui::{
-    DefaultTerminal, Frame,
     crossterm::{
         self,
         event::{Event, KeyCode, KeyEvent, KeyModifiers},
@@ -21,6 +20,7 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     widgets::Block,
+    DefaultTerminal, Frame,
 };
 
 use crate::{
@@ -208,7 +208,10 @@ fn app(
             }
             AppCommand::PlaylistUpdate(list) => {
                 let (by_artist, by_album) = MediaStore::get_tracks_tree(&list.list);
-                state.ui_state.borrow_mut().tracks.tree = by_artist;
+                let mut ui_state = state.ui_state.borrow_mut();
+                ui_state.tracks.tree_by_artist = by_artist;
+                ui_state.tracks.tree_by_album = by_album;
+                drop(ui_state);
                 *state.playlist.borrow_mut() = list;
                 force_render = true;
             }
@@ -320,6 +323,14 @@ fn app(
                 log::info!("current device: {device:?}");
                 let mut d = state.devices.borrow_mut();
                 d.current = device;
+            }
+            AppCommand::TogglePickerMode => {
+                use state::TracksMode::*;
+                let mut ui_state = state.ui_state.borrow_mut();
+                ui_state.tracks.mode = match ui_state.tracks.mode {
+                    Artist => Album,
+                    Album => Artist,
+                };
             }
         }
 
@@ -443,6 +454,12 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     ..
                 } => {
                     player_tx.send(PlayerCommand::PrevSong).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('a'),
+                    ..
+                } => {
+                    tx.send(AppCommand::TogglePickerMode).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Enter,

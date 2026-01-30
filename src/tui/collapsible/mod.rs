@@ -5,13 +5,11 @@ use ratatui::{
 use strum::EnumCount;
 
 use crate::tui::{
-    AppState,
     collapsible::{
-        devices_list::DevicesList,
-        keybinding::KeyBinding,
-        queue_list::QueueList,
+        devices_list::DevicesList, keybinding::KeyBinding, queue_list::QueueList,
         tracks_picker::TracksPicker,
     },
+    AppState,
 };
 
 pub mod devices_list;
@@ -44,26 +42,34 @@ impl CollapseWidgets {
 }
 
 pub trait CollapsibleWidget<T: HasTheme> {
-    fn title(&self) -> &'static str;
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut T);
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut T);
+
+    fn title(&self) -> Option<&'static str> {
+        None
+    }
 
     fn render(&self, area: Rect, buf: &mut Buffer, state: &mut T) {
         match area.height {
             0 => (),
             1 => self.render_collapse(area, buf, state),
             _ => {
-                let theme = state.theme();
-                let block = Block::default()
-                    .title(self.title())
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(theme.border))
-                    .title_style(Style::default().fg(theme.text).bold());
+                let area = if let Some(title) = self.title() {
+                    let theme = state.theme();
+                    let block = Block::default()
+                        .title(title)
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(theme.border))
+                        .title_style(Style::default().fg(theme.text).bold());
 
-                let inner_area = block.inner(area);
-                block.render(area, buf);
+                    let inner_area = block.inner(area);
+                    block.render(area, buf);
+                    inner_area
+                } else {
+                    area
+                };
 
-                self.render_expand_content(inner_area, buf, state);
+                self.render_expand_content(area, buf, state);
             }
         }
     }

@@ -36,6 +36,7 @@ pub enum AppCommand {
     ImageEncodeResult(ProtocolLruResult),
     DevicesList(Vec<PlaybackPCM>),
     DeviceUpdate((i32, i32)),
+    TogglePickerMode,
 }
 
 #[derive(Clone)]

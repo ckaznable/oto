@@ -160,55 +160,71 @@ impl MediaInfoState {
 }
 
 #[derive(Default)]
+pub enum TracksMode {
+    #[default]
+    Artist,
+    Album,
+}
+
+#[derive(Default)]
 pub struct TracksState {
-    pub tree: TracksTree,
+    pub tree_by_artist: TracksTree,
+    pub tree_by_album: TracksTree,
     pub playlist: Vec<usize>,
-    pub artist_index: usize,
-    pub album_inedx: usize,
+    pub primary_index: usize,
+    pub secondary_index: usize,
     pub track_index: usize,
     pub expand_index: usize,
-    pub artist_scroll: ScrollbarState,
-    pub album_scroll: ScrollbarState,
+    pub primary_scroll: ScrollbarState,
+    pub secondary_scroll: ScrollbarState,
     pub track_scroll: ScrollbarState,
+    pub mode: TracksMode,
 }
 
 impl CursorMovable for TracksState {
     fn cursor_index(&self) -> usize {
         match self.expand_index {
-            0 => self.artist_index,
-            1 => self.album_inedx,
+            0 => self.primary_index,
+            1 => self.secondary_index,
             _ => self.track_index,
         }
     }
 
     fn set_cursor_index(&mut self, index: usize) {
         match self.expand_index {
-            0 => self.artist_index = index,
-            1 => self.album_inedx = index,
+            0 => self.primary_index = index,
+            1 => self.secondary_index = index,
             _ => self.track_index = index,
         }
     }
 
     fn set_scroll_position(&mut self, position: usize) {
         match self.expand_index {
-            0 => self.artist_scroll = self.artist_scroll.position(position),
-            1 => self.album_scroll = self.album_scroll.position(position),
+            0 => self.primary_scroll = self.primary_scroll.position(position),
+            1 => self.secondary_scroll = self.secondary_scroll.position(position),
             _ => self.track_scroll = self.track_scroll.position(position),
         }
     }
 }
 
 impl TracksState {
+    pub fn current_tree(&self) -> &TracksTree {
+        match self.mode {
+            TracksMode::Artist => &self.tree_by_artist,
+            TracksMode::Album => &self.tree_by_album,
+        }
+    }
+
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> Option<usize> {
+        let tree = self.current_tree();
         let len = match self.expand_index {
-            0 => self.tree.len(),
-            1 => self.tree.get(self.artist_index)?.1.len(),
-            _ => self
-                .tree
-                .get(self.artist_index)?
+            0 => tree.len(),
+            1 => tree.get(self.primary_index)?.1.len(),
+            _ => tree
+                .get(self.primary_index)?
                 .1
-                .get(self.album_inedx)?
+                .get(self.secondary_index)?
                 .1
                 .len(),
         };

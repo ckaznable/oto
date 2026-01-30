@@ -5,8 +5,8 @@ use crate::tui::{collapsible::CollapsibleWidget, AppState};
 pub struct KeyBinding;
 
 impl CollapsibleWidget<AppState> for KeyBinding {
-    fn title(&self) -> &'static str {
-        " Keybinding "
+    fn title(&self) -> Option<&'static str> {
+        Some(" Keybinding ")
     }
 
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {

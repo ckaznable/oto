@@ -10,8 +10,8 @@ use crate::tui::{collapsible::CollapsibleWidget, AppState, LAYOUT_WIDTH_S};
 pub struct QueueList;
 
 impl CollapsibleWidget<AppState> for QueueList {
-    fn title(&self) -> &'static str {
-        " Queue "
+    fn title(&self) -> Option<&'static str> {
+        Some(" Queue ")
     }
 
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {

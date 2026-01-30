@@ -130,9 +130,9 @@ impl MediaStore {
                 .push(idx);
 
             album_map
-                .entry(artist)
-                .or_default()
                 .entry(album_name)
+                .or_default()
+                .entry(artist)
                 .or_default()
                 .push(idx);
         }

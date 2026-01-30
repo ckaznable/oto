@@ -5,35 +5,78 @@ use ratatui::{
     prelude::*,
     text::Span,
     widgets::{
-        List, ListItem, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget,
+        Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        StatefulWidget, Widget,
     },
 };
 
 use crate::media::TracksTree;
 use crate::tui::{
     collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
+    state::TracksMode,
     AppState,
 };
 
 pub struct TracksPicker;
 
-struct ArtistList;
-struct AlbumList;
+struct PrimaryList;
+struct SecondaryList;
 struct TrackList;
 
 const LAYERS_NUM: usize = 3;
 
 impl CollapsibleWidget<AppState> for TracksPicker {
-    fn title(&self) -> &'static str {
-        " Tracks "
-    }
-
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-        let expand_index = state.ui_state.borrow().tracks.expand_index;
+        let theme = &state.theme;
+        let ui_state = state.ui_state.borrow();
+        let mode = &ui_state.tracks.mode;
+        let expand_index = ui_state.tracks.expand_index;
+
+        let (artist_spans, album_spans): (Vec<Span>, Vec<Span>) = match mode {
+            TracksMode::Artist => (
+                vec![Span::styled(
+                    "Artist",
+                    Style::default().fg(theme.text).bold(),
+                )],
+                vec![
+                    Span::styled("A", Style::default().fg(theme.mode_playing_fg)),
+                    Span::styled("lbum", Style::default().fg(theme.overlay0)),
+                ],
+            ),
+            TracksMode::Album => (
+                vec![
+                    Span::styled("A", Style::default().fg(theme.mode_playing_fg)),
+                    Span::styled("rtist", Style::default().fg(theme.overlay0)),
+                ],
+                vec![Span::styled(
+                    "Album",
+                    Style::default().fg(theme.text).bold(),
+                )],
+            ),
+        };
+
+        let mut title_spans = vec![Span::raw(" ")];
+        title_spans.extend(artist_spans);
+        title_spans.push(Span::styled(" | ", Style::default().fg(theme.overlay0)));
+        title_spans.extend(album_spans);
+        title_spans.push(Span::raw(" "));
+
+        let title = Line::from(title_spans);
+
+        drop(ui_state);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.surface1))
+            .title(title);
+
+        let inner = block.inner(area);
+        block.render(area, buf);
+
         let widgets: &[&dyn CollapsibleWidget<AppState>; LAYERS_NUM] =
-            &[&ArtistList, &AlbumList, &TrackList];
+            &[&PrimaryList, &SecondaryList, &TrackList];
         let group = CollapsibleWidgetGroup::<LAYERS_NUM>::new(widgets, expand_index, 5);
-        StatefulWidget::render(group, area, buf, state);
+        StatefulWidget::render(group, inner, buf, state);
     }
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
@@ -50,25 +93,31 @@ impl CollapsibleWidget<AppState> for TracksPicker {
     }
 }
 
-impl CollapsibleWidget<AppState> for ArtistList {
-    fn title(&self) -> &'static str {
-        " Artist "
-    }
-
+impl CollapsibleWidget<AppState> for PrimaryList {
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+        let theme = &state.theme;
         let ui_state = state.ui_state.borrow();
-        let items: Vec<Rc<String>> = ui_state
-            .tracks
-            .tree
-            .iter()
-            .map(|(name, _)| name.clone())
-            .collect();
-        let cursor_index = ui_state.tracks.artist_index;
-        let scroll_state = ui_state.tracks.artist_scroll;
+        let tree = ui_state.tracks.current_tree();
+        let items: Vec<Rc<String>> = tree.iter().map(|(name, _)| name.clone()).collect();
+        let cursor_index = ui_state.tracks.primary_index;
+        let scroll_state = ui_state.tracks.primary_scroll;
+
+        let title = match ui_state.tracks.mode {
+            TracksMode::Artist => " Artist ",
+            TracksMode::Album => " Album ",
+        };
         drop(ui_state);
 
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.surface1))
+            .title(title);
+
+        let inner = block.inner(area);
+        block.render(area, buf);
+
         let new_scroll = render_list_with_scrollbar(
-            area,
+            inner,
             buf,
             state,
             &items,
@@ -76,7 +125,7 @@ impl CollapsibleWidget<AppState> for ArtistList {
             state.theme.media_artist,
             scroll_state,
         );
-        state.ui_state.borrow_mut().tracks.artist_scroll = new_scroll;
+        state.ui_state.borrow_mut().tracks.primary_scroll = new_scroll;
     }
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
@@ -84,20 +133,31 @@ impl CollapsibleWidget<AppState> for ArtistList {
     }
 }
 
-impl CollapsibleWidget<AppState> for AlbumList {
-    fn title(&self) -> &'static str {
-        " Album "
-    }
-
+impl CollapsibleWidget<AppState> for SecondaryList {
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+        let theme = &state.theme;
         let ui_state = state.ui_state.borrow();
-        let items = get_unique_albums(&ui_state.tracks.tree, ui_state.tracks.artist_index);
-        let cursor_index = ui_state.tracks.album_inedx;
-        let scroll_state = ui_state.tracks.album_scroll;
+        let tree = ui_state.tracks.current_tree();
+        let items = get_secondary_items(tree, ui_state.tracks.primary_index);
+        let cursor_index = ui_state.tracks.secondary_index;
+        let scroll_state = ui_state.tracks.secondary_scroll;
+
+        let title = match ui_state.tracks.mode {
+            TracksMode::Artist => " Album ",
+            TracksMode::Album => " Artist ",
+        };
         drop(ui_state);
 
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.surface1))
+            .title(title);
+
+        let inner = block.inner(area);
+        block.render(area, buf);
+
         let new_scroll = render_list_with_scrollbar(
-            area,
+            inner,
             buf,
             state,
             &items,
@@ -105,7 +165,7 @@ impl CollapsibleWidget<AppState> for AlbumList {
             state.theme.queue_album,
             scroll_state,
         );
-        state.ui_state.borrow_mut().tracks.album_scroll = new_scroll;
+        state.ui_state.borrow_mut().tracks.secondary_scroll = new_scroll;
     }
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
@@ -114,16 +174,17 @@ impl CollapsibleWidget<AppState> for AlbumList {
 }
 
 impl CollapsibleWidget<AppState> for TrackList {
-    fn title(&self) -> &'static str {
-        " Track "
+    fn title(&self) -> Option<&'static str> {
+        Some(" Track ")
     }
 
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let ui_state = state.ui_state.borrow();
+        let tree = ui_state.tracks.current_tree();
         let track_indices = get_track_indices(
-            &ui_state.tracks.tree,
-            ui_state.tracks.artist_index,
-            ui_state.tracks.album_inedx,
+            tree,
+            ui_state.tracks.primary_index,
+            ui_state.tracks.secondary_index,
         );
         let cursor_index = ui_state.tracks.track_index;
         let scroll_state = ui_state.tracks.track_scroll;
@@ -231,15 +292,19 @@ where
     scroll_state
 }
 
-fn get_unique_albums(tree: &TracksTree, artist_index: usize) -> Vec<Rc<String>> {
-    tree.get(artist_index)
-        .map(|(_, albums)| albums.iter().map(|(name, _)| name.clone()).collect())
+fn get_secondary_items(tree: &TracksTree, primary_index: usize) -> Vec<Rc<String>> {
+    tree.get(primary_index)
+        .map(|(_, items)| items.iter().map(|(name, _)| name.clone()).collect())
         .unwrap_or_default()
 }
 
-fn get_track_indices(tree: &TracksTree, artist_index: usize, album_index: usize) -> Vec<usize> {
-    tree.get(artist_index)
-        .and_then(|(_, albums)| albums.get(album_index))
+fn get_track_indices(
+    tree: &TracksTree,
+    primary_index: usize,
+    secondary_index: usize,
+) -> Vec<usize> {
+    tree.get(primary_index)
+        .and_then(|(_, items)| items.get(secondary_index))
         .map(|(_, indices)| indices.clone())
         .unwrap_or_default()
 }

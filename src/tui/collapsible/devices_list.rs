@@ -10,8 +10,8 @@ use crate::tui::{collapsible::CollapsibleWidget, AppState};
 pub struct DevicesList;
 
 impl CollapsibleWidget<AppState> for DevicesList {
-    fn title(&self) -> &'static str {
-        " Devices "
+    fn title(&self) -> Option<&'static str> {
+        Some(" Devices ")
     }
 
     fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
