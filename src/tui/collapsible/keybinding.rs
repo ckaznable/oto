@@ -26,6 +26,13 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             ("<C-k>", "Previous panel"),
             ("a", "Toggle Artist / Album"),
             ("<CR>", "Select item"),
+            ("<Tab>", "Pick item"),
+            ("g", "Go to top"),
+            ("G", "Go to bottom"),
+            ("<C-f>", "Page down"),
+            ("<C-b>", "Page up"),
+            ("<C-d>", "Half page down"),
+            ("<C-u>", "Half page up"),
             ("q", "Quit"),
         ];
 
