@@ -1,4 +1,4 @@
-use crate::{media::MediaStore, tui::state::CursorMovable};
+use crate::{event::CursorMove, media::MediaStore, tui::state::CursorMovable};
 use anyhow::anyhow;
 use enclose::enclose;
 use ratatui_image::picker::Picker;
@@ -455,13 +455,59 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     code: KeyCode::Char('j'),
                     ..
                 } => {
-                    tx.send(AppCommand::MoveListCursor(1)).ok();
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1)))
+                        .ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('k'),
                     ..
                 } => {
-                    tx.send(AppCommand::MoveListCursor(-1)).ok();
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1)))
+                        .ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('f'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(10)))
+                        .ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('b'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-10)))
+                        .ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('d'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(5)))
+                        .ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('u'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-5)))
+                        .ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('g'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Start)).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('G'),
+                    ..
+                } => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::End)).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('l'),
@@ -488,12 +534,6 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     player_tx.send(PlayerCommand::PrevSong).ok();
                 }
                 KeyEvent {
-                    code: KeyCode::Char('a'),
-                    ..
-                } => {
-                    tx.send(AppCommand::TogglePickerMode).ok();
-                }
-                KeyEvent {
                     code: KeyCode::Enter,
                     ..
                 } => {
@@ -503,6 +543,12 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     code: KeyCode::Tab, ..
                 } => {
                     tx.send(AppCommand::SelectItem).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('a'),
+                    ..
+                } => {
+                    tx.send(AppCommand::TogglePickerMode).ok();
                 }
                 _ => {}
             },

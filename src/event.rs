@@ -5,6 +5,13 @@ use crate::{
     tui::{image::ProtocolLruResult, AppMode},
 };
 
+#[derive(Clone, Copy)]
+pub enum CursorMove {
+    Steps(i16),
+    Start,
+    End,
+}
+
 #[derive(Clone)]
 pub enum PlayerCommand {
     PauseCycle,
@@ -30,7 +37,7 @@ pub enum AppCommand {
     TrackUpdate(TrackMeta, MediaSpec),
     PlaylistUpdate(PlayList),
     Rerender(bool),
-    MoveListCursor(i16),
+    MoveListCursor(CursorMove),
     MoveCollapseCursor(i16),
     MoveSubCollapseCursor(i16),
     SubmitItem,

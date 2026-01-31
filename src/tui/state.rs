@@ -18,23 +18,46 @@ pub struct CacheState {
 }
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 
-use crate::{media::TracksTree, tui::image::UnCachedProtocol};
+use crate::{event::CursorMove, media::TracksTree, tui::image::UnCachedProtocol};
 
 pub trait CursorMovable {
     fn cursor_index(&self) -> usize;
     fn set_cursor_index(&mut self, index: usize);
     fn set_scroll_position(&mut self, position: usize);
 
-    fn move_cursor(&mut self, steps: i16, len: usize) -> bool {
+    fn move_to_start(&mut self) {
+        self.set_cursor_index(0);
+        self.set_scroll_position(0);
+    }
+
+    fn move_to_end(&mut self, len: usize) {
+        self.set_cursor_index(len - 1);
+        self.set_scroll_position(len - 1);
+    }
+
+    fn move_cursor(&mut self, steps: CursorMove, len: usize) -> bool {
         if len == 0 {
             return false;
         }
 
+        use CursorMove::*;
         let old_index = self.cursor_index();
-        let new_index = if steps >= 0 {
-            (old_index + steps as usize).min(len.saturating_sub(1))
-        } else {
-            old_index.saturating_sub(steps.unsigned_abs() as usize)
+        let new_index = match steps {
+            Steps(steps) => {
+                if steps >= 0 {
+                    if old_index == len - 1 {
+                        0
+                    } else {
+                        (old_index + steps as usize).min(len.saturating_sub(1))
+                    }
+                } else if old_index == 0 {
+                    len - 1
+                } else {
+                    old_index.saturating_sub(steps.unsigned_abs() as usize)
+                }
+            }
+            Start => 0,
+            End => len - 1,
         };
 
         if new_index != old_index {
