@@ -9,7 +9,7 @@ impl CollapsibleWidget<AppState> for KeyBinding {
         Some(" Keybinding ")
     }
 
-    fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
 
         let bindings = [
@@ -60,7 +60,7 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             Span::styled(" 󰒮 󰒭 <", Style::default().fg(theme.overlay0)),
             Span::styled("H/L", Style::default().fg(theme.media_title)),
             Span::styled(">", Style::default().fg(theme.overlay0)),
-            Span::styled("  <", Style::default().fg(theme.overlay0)),
+            Span::styled("  <", Style::default().fg(theme.overlay0)),
             Span::styled("J/K", Style::default().fg(theme.media_title)),
             Span::styled(">", Style::default().fg(theme.overlay0)),
             Span::styled(" <", Style::default().fg(theme.overlay0)),

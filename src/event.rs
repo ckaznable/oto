@@ -2,7 +2,7 @@ use crate::{
     devices::PlaybackPCM,
     media::{MediaSpec, TrackMeta},
     player::PlayList,
-    tui::{AppMode, image::ProtocolLruResult},
+    tui::{image::ProtocolLruResult, AppMode},
 };
 
 #[derive(Clone)]
@@ -32,6 +32,7 @@ pub enum AppCommand {
     MoveListCursor(i16),
     MoveCollapseCursor(i16),
     MoveSubCollapseCursor(i16),
+    SubmitItem,
     SelectItem,
     ImageEncodeResult(ProtocolLruResult),
     DevicesList(Vec<PlaybackPCM>),

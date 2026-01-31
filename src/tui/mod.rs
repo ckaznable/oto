@@ -100,6 +100,7 @@ pub struct AppState {
     theme: Rc<Theme>,
     ui_state: Rc<RefCell<UiState>>,
     devices: Rc<RefCell<DevicesState>>,
+    pub cache: Rc<RefCell<state::CacheState>>,
 }
 
 impl AppState {
@@ -114,6 +115,7 @@ impl AppState {
             theme: Rc::new(Theme::default()),
             ui_state: Rc::new(RefCell::new(UiState::default())),
             devices: Rc::new(RefCell::new(Default::default())),
+            cache: Rc::new(RefCell::new(state::CacheState::default())),
         }
     }
 }
@@ -260,14 +262,14 @@ fn app(
                     force_render = true;
                     if steps > 0 {
                         ui_state.tracks.expand_index =
-                            ui_state.tracks.expand_index.saturating_add(1).clamp(0, 2);
+                            ui_state.tracks.expand_index.saturating_add(1).clamp(0, 3);
                     } else {
                         ui_state.tracks.expand_index =
-                            ui_state.tracks.expand_index.saturating_sub(1).clamp(0, 2);
+                            ui_state.tracks.expand_index.saturating_sub(1).clamp(0, 3);
                     }
                 }
             }
-            AppCommand::SelectItem => {
+            AppCommand::SubmitItem => {
                 let ui_state = state.ui_state.borrow();
                 match CollapseWidgets::get(ui_state.expand_index) {
                     CollapseWidgets::QueueList => {
@@ -299,6 +301,16 @@ fn app(
                     }
                     _ => (),
                 };
+            }
+            AppCommand::SelectItem => {
+                let mut ui_state = state.ui_state.borrow_mut();
+                if matches!(
+                    CollapseWidgets::get(ui_state.expand_index),
+                    CollapseWidgets::TrackPicker
+                ) {
+                    ui_state.tracks.pick();
+                    force_render = true;
+                }
             }
             AppCommand::ImageEncodeResult(result) => {
                 force_render = true;
@@ -389,6 +401,13 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                 }
                 KeyEvent {
                     code: KeyCode::Char(' '),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                } => {
+                    tx.send(AppCommand::SelectItem).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char(' '),
                     ..
                 } => {
                     player_tx.send(PlayerCommand::PauseCycle).ok();
@@ -464,6 +483,11 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                 KeyEvent {
                     code: KeyCode::Enter,
                     ..
+                } => {
+                    tx.send(AppCommand::SubmitItem).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Tab, ..
                 } => {
                     tx.send(AppCommand::SelectItem).ok();
                 }

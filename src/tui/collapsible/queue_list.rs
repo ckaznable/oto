@@ -14,7 +14,7 @@ impl CollapsibleWidget<AppState> for QueueList {
         Some(" Queue ")
     }
 
-    fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let playlist = state.playlist.borrow();
         let list_len = playlist.list.len();
@@ -37,7 +37,7 @@ impl CollapsibleWidget<AppState> for QueueList {
         let visible_height = table_area.height.saturating_sub(1) as usize; // Subtract 1 for header
         let offset = calculate_scroll_offset(cursor_index, visible_height, list_len);
 
-        state.ui_state.borrow_mut().cache.rows.clear();
+        state.cache.borrow_mut().rows.clear();
 
         let list_iter = playlist
             .list
@@ -96,7 +96,7 @@ impl CollapsibleWidget<AppState> for QueueList {
             .style(Style::default().bg(bg_color))
             .height(1);
 
-            state.ui_state.borrow_mut().cache.rows.push(row);
+            state.cache.borrow_mut().rows.push(row);
         }
 
         drop(playlist);
@@ -120,9 +120,9 @@ impl CollapsibleWidget<AppState> for QueueList {
         )
         .height(1);
 
-        let mut ui_state = state.ui_state.borrow_mut();
+        let mut cache = state.cache.borrow_mut();
         let table = Table::new(
-            ui_state.cache.rows.drain(..),
+            cache.rows.drain(..),
             if is_compact {
                 [
                     Constraint::Fill(1),
@@ -146,7 +146,7 @@ impl CollapsibleWidget<AppState> for QueueList {
         .row_highlight_style(Style::default().bg(theme.surface1));
 
         Widget::render(table, table_area, buf);
-        drop(ui_state);
+        drop(cache);
 
         let mut scroll_state = state.ui_state.borrow().queue.scroll_state;
         scroll_state = scroll_state.position(cursor_index);

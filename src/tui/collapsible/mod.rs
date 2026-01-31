@@ -42,7 +42,7 @@ impl CollapseWidgets {
 }
 
 pub trait CollapsibleWidget<T: HasTheme> {
-    fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut T);
+    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut T);
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut T);
 
     fn title(&self) -> Option<&'static str> {
@@ -69,7 +69,7 @@ pub trait CollapsibleWidget<T: HasTheme> {
                     area
                 };
 
-                self.render_expand_content(area, buf, state);
+                self.render_expand(area, buf, state);
             }
         }
     }

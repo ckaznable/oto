@@ -2,12 +2,19 @@ use std::io::Cursor;
 
 use anyhow::Result;
 use image::ImageReader;
+use indexmap::IndexSet;
 use ratatui::widgets::{ListItem, Row, ScrollbarState};
+use rustc_hash::FxBuildHasher;
+
+type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
+
+use ratatui::text::Line;
 
 #[derive(Default)]
 pub struct CacheState {
     pub rows: Vec<Row<'static>>,
     pub list_items: Vec<ListItem<'static>>,
+    pub tracks_items: Vec<(Line<'static>, bool)>,
 }
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 
@@ -170,14 +177,16 @@ pub enum TracksMode {
 pub struct TracksState {
     pub tree_by_artist: TracksTree,
     pub tree_by_album: TracksTree,
-    pub playlist: Vec<usize>,
+    pub playlist: FxIndexSet<usize>,
     pub primary_index: usize,
     pub secondary_index: usize,
     pub track_index: usize,
+    pub playlist_index: usize,
     pub expand_index: usize,
     pub primary_scroll: ScrollbarState,
     pub secondary_scroll: ScrollbarState,
     pub track_scroll: ScrollbarState,
+    pub playlist_scroll: ScrollbarState,
     pub mode: TracksMode,
 }
 
@@ -186,7 +195,8 @@ impl CursorMovable for TracksState {
         match self.expand_index {
             0 => self.primary_index,
             1 => self.secondary_index,
-            _ => self.track_index,
+            2 => self.track_index,
+            _ => self.playlist_index,
         }
     }
 
@@ -194,7 +204,8 @@ impl CursorMovable for TracksState {
         match self.expand_index {
             0 => self.primary_index = index,
             1 => self.secondary_index = index,
-            _ => self.track_index = index,
+            2 => self.track_index = index,
+            _ => self.playlist_index = index,
         }
     }
 
@@ -202,12 +213,99 @@ impl CursorMovable for TracksState {
         match self.expand_index {
             0 => self.primary_scroll = self.primary_scroll.position(position),
             1 => self.secondary_scroll = self.secondary_scroll.position(position),
-            _ => self.track_scroll = self.track_scroll.position(position),
+            2 => self.track_scroll = self.track_scroll.position(position),
+            _ => self.playlist_scroll = self.playlist_scroll.position(position),
         }
     }
 }
 
 impl TracksState {
+    pub fn pick(&mut self) -> Option<()> {
+        match self.expand_index {
+            0 => self.pick_all_primary(self.is_primary_selected(self.primary_index)),
+            1 => self.pick_all_secondary(self.is_secondary_selected(self.secondary_index)),
+            2 => self.pick_track(),
+            3 => {
+                self.remove_from_playlist();
+                None
+            }
+            _ => None,
+        }
+    }
+
+    pub fn remove_from_playlist(&mut self) {
+        self.playlist.shift_remove_index(self.playlist_index);
+    }
+
+    pub fn pick_all_primary(&mut self, remove: bool) -> Option<()> {
+        let tree = match self.mode {
+            TracksMode::Artist => &self.tree_by_artist,
+            TracksMode::Album => &self.tree_by_album,
+        };
+
+        let indices: Vec<usize> = tree
+            .get(self.primary_index)?
+            .1
+            .iter()
+            .flat_map(|(_, v)| v.iter().copied())
+            .collect();
+
+        for idx in indices {
+            if remove {
+                self.playlist.shift_remove(&idx);
+            } else {
+                self.playlist.insert(idx);
+            }
+        }
+
+        Some(())
+    }
+
+    pub fn pick_all_secondary(&mut self, remove: bool) -> Option<()> {
+        let tree = match self.mode {
+            TracksMode::Artist => &self.tree_by_artist,
+            TracksMode::Album => &self.tree_by_album,
+        };
+
+        let indices: Vec<usize> = tree
+            .get(self.primary_index)?
+            .1
+            .get(self.secondary_index)?
+            .1
+            .clone();
+
+        for idx in indices {
+            if remove {
+                self.playlist.shift_remove(&idx);
+            } else {
+                self.playlist.insert(idx);
+            }
+        }
+
+        Some(())
+    }
+
+    pub fn pick_track(&mut self) -> Option<()> {
+        let tree = match self.mode {
+            TracksMode::Artist => &self.tree_by_artist,
+            TracksMode::Album => &self.tree_by_album,
+        };
+
+        let idx = tree
+            .get(self.primary_index)?
+            .1
+            .get(self.secondary_index)?
+            .1
+            .get(self.track_index)?;
+
+        if self.playlist.contains(idx) {
+            self.playlist.shift_remove(idx);
+        } else {
+            self.playlist.insert(*idx);
+        }
+        Some(())
+    }
+
     pub fn current_tree(&self) -> &TracksTree {
         match self.mode {
             TracksMode::Artist => &self.tree_by_artist,
@@ -221,15 +319,37 @@ impl TracksState {
         let len = match self.expand_index {
             0 => tree.len(),
             1 => tree.get(self.primary_index)?.1.len(),
-            _ => tree
+            2 => tree
                 .get(self.primary_index)?
                 .1
                 .get(self.secondary_index)?
                 .1
                 .len(),
+            _ => self.playlist.len(),
         };
 
         Some(len)
+    }
+
+    pub fn is_primary_selected(&self, index: usize) -> bool {
+        let tree = self.current_tree();
+        if let Some((_, secondary_list)) = tree.get(index) {
+            secondary_list.iter().all(|(_, track_indices)| {
+                track_indices.iter().all(|idx| self.playlist.contains(idx))
+            })
+        } else {
+            false
+        }
+    }
+
+    pub fn is_secondary_selected(&self, index: usize) -> bool {
+        let tree = self.current_tree();
+        if let Some((_, items)) = tree.get(self.primary_index)
+            && let Some((_, track_indices)) = items.get(index)
+        {
+            return track_indices.iter().all(|idx| self.playlist.contains(idx));
+        }
+        false
     }
 }
 
@@ -241,5 +361,4 @@ pub struct UiState {
     pub cover: Option<UnCachedProtocol>,
     pub tracks: TracksState,
     pub expand_index: usize,
-    pub cache: CacheState,
 }

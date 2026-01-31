@@ -31,6 +31,8 @@ unicode-width = "0.2"
 mini-moka = "0.10"
 bitcode = "0.6.9"
 zstd = "0.13.3"
+indexmap = "2.13.0"
+rustc-hash = "2.1.1"
 
 [profile.release]
 opt-level = 3

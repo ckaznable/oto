@@ -14,7 +14,7 @@ impl CollapsibleWidget<AppState> for DevicesList {
         Some(" Devices ")
     }
 
-    fn render_expand_content(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+    fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let devices = state.devices.borrow();
         let current_device = devices.current;
@@ -52,7 +52,7 @@ impl CollapsibleWidget<AppState> for DevicesList {
         let visible_height = list_area.height as usize;
         let offset = calculate_scroll_offset(cursor_index, visible_height, list_len);
 
-        state.ui_state.borrow_mut().cache.list_items.clear();
+        state.cache.borrow_mut().list_items.clear();
 
         let list_iter = flat_list
             .iter()
@@ -83,15 +83,15 @@ impl CollapsibleWidget<AppState> for DevicesList {
             ]);
 
             let item = ListItem::new(line).style(Style::default().bg(bg_color));
-            state.ui_state.borrow_mut().cache.list_items.push(item);
+            state.cache.borrow_mut().list_items.push(item);
         }
 
         drop(devices);
 
-        let mut ui_state = state.ui_state.borrow_mut();
-        let list = List::new(ui_state.cache.list_items.drain(..));
+        let mut cache = state.cache.borrow_mut();
+        let list = List::new(cache.list_items.drain(..));
         Widget::render(list, list_area, buf);
-        drop(ui_state);
+        drop(cache);
 
         let mut scroll_state = state.ui_state.borrow().devices.scroll_state;
         scroll_state = scroll_state.position(cursor_index);
@@ -138,7 +138,7 @@ impl CollapsibleWidget<AppState> for DevicesList {
             .unwrap_or_else(|| "No Device".to_string());
 
         Line::from(vec![
-            Span::raw("  "),
+            Span::raw(" 󰭵 "),
             Span::styled(current_name, Style::default().fg(theme.text)),
         ])
         .style(Style::default().bg(theme.collapse_devices_bg))
