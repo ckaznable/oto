@@ -100,7 +100,7 @@ pub struct AppState {
     theme: Rc<Theme>,
     ui_state: Rc<RefCell<UiState>>,
     devices: Rc<RefCell<DevicesState>>,
-    pub cache: Rc<RefCell<state::CacheState>>,
+    cache: Rc<RefCell<state::CacheState>>,
 }
 
 impl AppState {
@@ -183,11 +183,9 @@ fn app(
             }
             AppCommand::AppModeUpdate(mode) => {
                 state.app_mode.set(mode);
-                force_render = true;
             }
             AppCommand::VolumeUpdate(vol) => {
                 state.volume.set(vol);
-                force_render = true;
             }
             AppCommand::TrackUpdate(track, spec) => {
                 log::info!("playing: {:?}", &track);
@@ -209,11 +207,14 @@ fn app(
                 force_render = true;
             }
             AppCommand::PlaylistUpdate(list) => {
-                let (by_artist, by_album) = MediaStore::get_tracks_tree(&list.list);
                 let mut ui_state = state.ui_state.borrow_mut();
-                ui_state.tracks.tree_by_artist = by_artist;
-                ui_state.tracks.tree_by_album = by_album;
+                if ui_state.tracks.tree_by_artist.is_empty() {
+                    let (by_artist, by_album) = MediaStore::get_tracks_tree(&list.list);
+                    ui_state.tracks.tree_by_artist = by_artist;
+                    ui_state.tracks.tree_by_album = by_album;
+                }
                 drop(ui_state);
+
                 *state.playlist.borrow_mut() = list;
                 force_render = true;
             }
@@ -244,6 +245,8 @@ fn app(
                 };
             }
             AppCommand::MoveCollapseCursor(steps) => {
+                force_render = true;
+
                 let mut ui_state = state.ui_state.borrow_mut();
                 let index = ui_state.expand_index;
 
@@ -270,7 +273,7 @@ fn app(
                 }
             }
             AppCommand::SubmitItem => {
-                let ui_state = state.ui_state.borrow();
+                let mut ui_state = state.ui_state.borrow_mut();
                 match CollapseWidgets::get(ui_state.expand_index) {
                     CollapseWidgets::QueueList => {
                         let index = ui_state.queue.cursor_index;
@@ -297,6 +300,16 @@ fn app(
 
                         if let Some(d) = d {
                             player_tx.send(PlayerCommand::SetDevice(d)).ok();
+                        }
+                    }
+                    CollapseWidgets::TrackPicker => {
+                        if !ui_state.tracks.playlist.is_empty() {
+                            player_tx
+                                .send(PlayerCommand::SetPickedPlaylist(
+                                    ui_state.tracks.playlist.iter().cloned().collect(),
+                                ))
+                                .ok();
+                            ui_state.tracks.clear_picked();
                         }
                     }
                     _ => (),

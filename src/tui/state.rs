@@ -351,6 +351,10 @@ impl TracksState {
         }
         false
     }
+
+    pub fn clear_picked(&mut self) {
+        self.playlist.clear();
+    }
 }
 
 #[derive(Default)]

@@ -17,6 +17,7 @@ pub enum PlayerCommand {
     PlayTrackWithIndex(usize),
     GetDevices,
     SetDevice((i32, i32)),
+    SetPickedPlaylist(Vec<usize>),
 }
 
 pub enum AppCommand {

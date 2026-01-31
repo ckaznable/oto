@@ -302,6 +302,20 @@ fn player_event_loop(
 
                     player.clear_buffer();
                 }
+                PlayerCommand::SetPickedPlaylist(picked) => {
+                    player.playlist.pick(picked);
+                    if let Ok(Some(track)) = player.reload() {
+                        player.clear_buffer();
+                        output.drop().ok();
+                        output.prepare().ok();
+
+                        let spec = player.spec.unwrap_or_default();
+                        tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
+                        mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
+                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                            .ok();
+                    }
+                }
             }
         }
 

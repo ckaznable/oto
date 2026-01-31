@@ -232,6 +232,15 @@ impl BufferPlayer {
         Ok(None)
     }
 
+    pub fn reload(&mut self) -> Result<Option<TrackMeta>> {
+        if let Some(track) = self.current() {
+            self.open(&track.path)?;
+            return Ok(Some(track));
+        }
+
+        Ok(None)
+    }
+
     pub fn current(&mut self) -> Option<TrackMeta> {
         self.playlist.current().cloned()
     }
@@ -356,6 +365,7 @@ impl BufferPlayer {
 #[derive(Clone, Default)]
 pub struct PlayList {
     pub list: Arc<Tracks>,
+    pub picked: Arc<Option<Vec<usize>>>,
     pub index: usize,
 }
 
@@ -363,12 +373,30 @@ impl PlayList {
     pub fn new(p: Option<PathBuf>) -> Self {
         Self {
             list: Arc::new(MediaStore::get_tracks(p.as_deref())),
+            picked: Arc::new(None),
             index: 0,
         }
     }
 
+    pub fn playing_index(&self, index: usize) -> usize {
+        if let Some(p) = self.picked.as_deref() {
+            p.get(index).cloned().unwrap_or_default()
+        } else {
+            index
+        }
+    }
+
+    pub fn pick(&mut self, picked: Vec<usize>) {
+        self.index = 0;
+        self.picked = Arc::new(if picked.is_empty() {
+            None
+        } else {
+            Some(picked)
+        });
+    }
+
     pub fn play(&mut self, index: usize) -> Option<TrackMeta> {
-        let track = self.list.get(index).cloned()?;
+        let track = self.list.get(self.playing_index(index)).cloned()?;
         self.index = index;
         Some(track)
     }
@@ -381,21 +409,25 @@ impl PlayList {
         }
 
         self.index = next;
-        self.list.get(next).cloned()
+        self.list.get(self.playing_index(self.index)).cloned()
     }
 
     pub fn prev(&mut self) -> Option<TrackMeta> {
         self.index = self.index.saturating_sub(1);
-        self.list.get(self.index).cloned()
+        self.list.get(self.playing_index(self.index)).cloned()
     }
 
     #[inline]
     pub fn current(&self) -> Option<&TrackMeta> {
-        self.list.get(self.index)
+        self.list.get(self.playing_index(self.index))
     }
 
     #[inline]
     pub fn is_end(&self) -> bool {
-        self.list.len() == self.index.saturating_sub(1)
+        if let Some(p) = self.picked.as_deref() {
+            p.len() == self.index.saturating_sub(1)
+        } else {
+            self.list.len() == self.index.saturating_sub(1)
+        }
     }
 }

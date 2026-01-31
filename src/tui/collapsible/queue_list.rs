@@ -1,3 +1,4 @@
+use itertools::Either;
 use ratatui::{
     layout::{Constraint, Layout, Margin},
     prelude::*,
@@ -5,7 +6,7 @@ use ratatui::{
     widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, StatefulWidget, Table, Widget},
 };
 
-use crate::tui::{collapsible::CollapsibleWidget, AppState, LAYOUT_WIDTH_S};
+use crate::tui::{AppState, LAYOUT_WIDTH_S, collapsible::CollapsibleWidget};
 
 pub struct QueueList;
 
@@ -39,12 +40,24 @@ impl CollapsibleWidget<AppState> for QueueList {
 
         state.cache.borrow_mut().rows.clear();
 
-        let list_iter = playlist
-            .list
-            .iter()
-            .enumerate()
-            .skip(offset)
-            .take(visible_height);
+        let list_iter = match playlist.picked.as_deref() {
+            Some(picked) => Either::Left(
+                picked
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, idx)| Some((i, playlist.list.get(*idx)?)))
+                    .skip(offset)
+                    .take(visible_height),
+            ),
+            None => Either::Right(
+                playlist
+                    .list
+                    .iter()
+                    .enumerate()
+                    .skip(offset)
+                    .take(visible_height),
+            ),
+        };
 
         for (index, track) in list_iter {
             let title = track.title.clone().unwrap_or_else(|| "Unknown".to_string());

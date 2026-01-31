@@ -2025,6 +2025,7 @@ dependencies = [
  "id3",
  "image",
  "indexmap",
+ "itertools 0.14.0",
  "lofty",
  "log",
  "mini-moka",
