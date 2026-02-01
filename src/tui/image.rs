@@ -256,31 +256,39 @@ impl UnCachedProtocol {
     pub fn update_resized_protocol(&mut self, completed: StatefulProtocol) {
         self.inner.replace(completed);
     }
+
+    pub fn reload(&mut self) {
+        self.loading = false;
+    }
 }
 
 impl ResizeEncodeRender for UnCachedProtocol {
     fn needs_resize(&self, resize: &Resize, area: Rect) -> Option<Rect> {
-        if !self.loading {
-            return Some(area);
+        if let Some(ref protocol) = self.inner {
+            return protocol.needs_resize(resize, area);
         }
 
-        self.inner
-            .as_ref()
-            .and_then(|protocol| protocol.needs_resize(resize, area))
+        if self.loading {
+            return None;
+        }
+
+        Some(area)
     }
 
     fn resize_encode(&mut self, resize: &Resize, area: Rect) {
-        self.tx
-            .send(ProtocolLruData::UnCached {
-                image: UnCachedImage::Cover,
-                protocol: self.inner.take(),
-                resize: resize.clone(),
-                area,
-                path: self.path.clone(),
-            })
-            .ok();
+        if !self.loading {
+            self.tx
+                .send(ProtocolLruData::UnCached {
+                    image: UnCachedImage::Cover,
+                    protocol: self.inner.take(),
+                    resize: resize.clone(),
+                    area,
+                    path: self.path.clone(),
+                })
+                .ok();
 
-        self.loading = true;
+            self.loading = true;
+        }
     }
 
     fn render(&mut self, area: Rect, buf: &mut Buffer) {

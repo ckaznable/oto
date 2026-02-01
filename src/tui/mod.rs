@@ -1,4 +1,8 @@
-use crate::{event::{CursorMove, PickedPlaylist}, media::MediaStore, tui::state::CursorMovable};
+use crate::{
+    event::{CursorMove, PickedPlaylist},
+    media::MediaStore,
+    tui::state::CursorMovable,
+};
 use anyhow::anyhow;
 use enclose::enclose;
 use ratatui_image::picker::Picker;
@@ -306,9 +310,9 @@ fn app(
                         if !ui_state.tracks.playlist.is_empty() {
                             let picked = ui_state.tracks.playlist.iter().cloned().collect();
                             player_tx
-                                .send(PlayerCommand::SetPickedPlaylist(
-                                    PickedPlaylist::Picked(picked)
-                                ))
+                                .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Picked(
+                                    picked,
+                                )))
                                 .ok();
                             ui_state.tracks.clear_picked();
                         }
@@ -321,9 +325,9 @@ fn app(
                 if let CollapseWidgets::TrackPicker = CollapseWidgets::get(ui_state.expand_index) {
                     let picked = ui_state.tracks.playlist.iter().cloned().collect();
                     player_tx
-                        .send(PlayerCommand::SetPickedPlaylist(
-                            PickedPlaylist::Append(picked)
-                        ))
+                        .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Append(
+                            picked,
+                        )))
                         .ok();
                     ui_state.tracks.clear_picked();
                 }
@@ -334,7 +338,7 @@ fn app(
                     let picked = ui_state.tracks.playlist.iter().cloned().collect();
                     player_tx
                         .send(PlayerCommand::SetPickedPlaylist(
-                            PickedPlaylist::InsertNext(picked)
+                            PickedPlaylist::InsertNext(picked),
                         ))
                         .ok();
                     ui_state.tracks.clear_picked();
@@ -382,6 +386,14 @@ fn app(
                     Album => Artist,
                 };
             }
+            AppCommand::Resize => {
+                let _ = state
+                    .ui_state
+                    .borrow_mut()
+                    .cover
+                    .as_mut()
+                    .map(|c| c.reload());
+            }
         }
 
         if force_render || timer.elapsed() >= min_refresh_duration {
@@ -428,7 +440,7 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
     loop {
         match crossterm::event::read() {
             Ok(Event::Resize(_, _)) => {
-                tx.send(AppCommand::Rerender(false)).ok();
+                tx.send(AppCommand::Resize).ok();
             }
             Ok(Event::Key(event)) => match event {
                 KeyEvent {

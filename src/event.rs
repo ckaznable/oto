@@ -44,6 +44,7 @@ pub enum AppCommand {
     TrackUpdate(TrackMeta, MediaSpec),
     PlaylistUpdate(PlayList),
     Rerender(bool),
+    Resize,
     MoveListCursor(CursorMove),
     MoveCollapseCursor(i16),
     MoveSubCollapseCursor(i16),
