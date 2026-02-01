@@ -38,7 +38,7 @@ pub trait Decoder {
 
 #[derive(Default)]
 pub struct MixDecoder {
-    file_path: Option<PathBuf>,
+    pub file_path: Option<PathBuf>,
     decoder: Option<Box<dyn Decoder>>,
 }
 
