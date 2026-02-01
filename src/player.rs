@@ -15,6 +15,7 @@ use ringbuf::{
 
 use crate::{
     decoder::{Decoder, DecoderError, MixDecoder},
+    event::PickedPlaylist,
     media::{MediaSpec, MediaStore, OutputMode, TrackMeta, Tracks},
     shared::{RING_BUF_ALLOC, TMP_BUF_ALLOC},
 };
@@ -234,7 +235,11 @@ impl BufferPlayer {
 
     pub fn reload(&mut self) -> Result<Option<TrackMeta>> {
         if let Some(track) = self.current() {
-            self.open(&track.path)?;
+            if let Some(ref path) = self.decoder.file_path
+                && path != &track.path
+            {
+                self.open(&track.path)?;
+            }
             return Ok(Some(track));
         }
 
@@ -386,13 +391,33 @@ impl PlayList {
         }
     }
 
-    pub fn pick(&mut self, picked: Vec<usize>) {
-        self.index = 0;
-        self.picked = Arc::new(if picked.is_empty() {
-            None
-        } else {
-            Some(picked)
-        });
+    pub fn pick(&mut self, picked: PickedPlaylist) {
+        match picked {
+            PickedPlaylist::Picked(items) => {
+                self.index = 0;
+                self.picked = Arc::new(if items.is_empty() { None } else { Some(items) });
+            }
+            PickedPlaylist::InsertNext(items) => {
+                self.init_picked();
+                let mut new_picked = self.picked.as_deref().unwrap().to_vec();
+                let mut tail = new_picked.split_off(self.index + 1);
+                new_picked.extend(items);
+                new_picked.append(&mut tail);
+                self.picked = Arc::new(Some(new_picked));
+            }
+            PickedPlaylist::Append(items) => {
+                self.init_picked();
+                let mut new_picked = self.picked.as_deref().unwrap().to_vec();
+                new_picked.extend(items);
+                self.picked = Arc::new(Some(new_picked));
+            }
+        }
+    }
+
+    fn init_picked(&mut self) {
+        if self.picked.is_none() {
+            self.picked = Arc::new(Some((0..self.list.len()).collect()));
+        }
     }
 
     pub fn play(&mut self, index: usize) -> Option<TrackMeta> {

@@ -14,7 +14,7 @@ use clap::Parser;
 use oto::{
     cli,
     devices::{get_default_device, list_devices},
-    event::{AppCommand, MprisCommand, PlayerCommand},
+    event::{AppCommand, MprisCommand, PickedPlaylist, PlayerCommand},
     mpris,
     player::{AudioOutput, BufferPlayer, LastPlayerState, PlayerError},
     volume::VolumeController,
@@ -303,8 +303,12 @@ fn player_event_loop(
                     player.clear_buffer();
                 }
                 PlayerCommand::SetPickedPlaylist(picked) => {
+                    let is_set_whole_list = matches!(picked, PickedPlaylist::Picked(_));
                     player.playlist.pick(picked);
-                    if let Ok(Some(track)) = player.reload() {
+
+                    if let Ok(Some(track)) = player.reload()
+                        && is_set_whole_list
+                    {
                         player.clear_buffer();
                         output.drop().ok();
                         output.prepare().ok();
@@ -312,9 +316,10 @@ fn player_event_loop(
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
-                        tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
-                            .ok();
                     }
+
+                    tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                        .ok();
                 }
             }
         }

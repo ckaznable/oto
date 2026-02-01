@@ -18,7 +18,10 @@ impl CollapsibleWidget<AppState> for QueueList {
     fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let playlist = state.playlist.borrow();
-        let list_len = playlist.list.len();
+        let list_len = match playlist.picked.as_deref() {
+            Some(p) => p.len(),
+            None => playlist.list.len(),
+        };
         let playlist_index = playlist.index;
 
         let mut ui_state = state.ui_state.borrow_mut();

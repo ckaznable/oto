@@ -12,6 +12,13 @@ pub enum CursorMove {
     End,
 }
 
+#[derive(Clone, Debug)]
+pub enum PickedPlaylist {
+    Picked(Vec<usize>),
+    InsertNext(Vec<usize>),
+    Append(Vec<usize>),
+}
+
 #[derive(Clone)]
 pub enum PlayerCommand {
     PauseCycle,
@@ -24,7 +31,7 @@ pub enum PlayerCommand {
     PlayTrackWithIndex(usize),
     GetDevices,
     SetDevice((i32, i32)),
-    SetPickedPlaylist(Vec<usize>),
+    SetPickedPlaylist(PickedPlaylist),
 }
 
 pub enum AppCommand {
@@ -42,6 +49,8 @@ pub enum AppCommand {
     MoveSubCollapseCursor(i16),
     SubmitItem,
     SelectItem,
+    InsertItem,
+    AppendItem,
     ImageEncodeResult(ProtocolLruResult),
     DevicesList(Vec<PlaybackPCM>),
     DeviceUpdate((i32, i32)),

@@ -1,4 +1,4 @@
-use crate::{event::CursorMove, media::MediaStore, tui::state::CursorMovable};
+use crate::{event::{CursorMove, PickedPlaylist}, media::MediaStore, tui::state::CursorMovable};
 use anyhow::anyhow;
 use enclose::enclose;
 use ratatui_image::picker::Picker;
@@ -304,9 +304,10 @@ fn app(
                     }
                     CollapseWidgets::TrackPicker => {
                         if !ui_state.tracks.playlist.is_empty() {
+                            let picked = ui_state.tracks.playlist.iter().cloned().collect();
                             player_tx
                                 .send(PlayerCommand::SetPickedPlaylist(
-                                    ui_state.tracks.playlist.iter().cloned().collect(),
+                                    PickedPlaylist::Picked(picked)
                                 ))
                                 .ok();
                             ui_state.tracks.clear_picked();
@@ -314,6 +315,30 @@ fn app(
                     }
                     _ => (),
                 };
+            }
+            AppCommand::AppendItem => {
+                let mut ui_state = state.ui_state.borrow_mut();
+                if let CollapseWidgets::TrackPicker = CollapseWidgets::get(ui_state.expand_index) {
+                    let picked = ui_state.tracks.playlist.iter().cloned().collect();
+                    player_tx
+                        .send(PlayerCommand::SetPickedPlaylist(
+                            PickedPlaylist::Append(picked)
+                        ))
+                        .ok();
+                    ui_state.tracks.clear_picked();
+                }
+            }
+            AppCommand::InsertItem => {
+                let mut ui_state = state.ui_state.borrow_mut();
+                if let CollapseWidgets::TrackPicker = CollapseWidgets::get(ui_state.expand_index) {
+                    let picked = ui_state.tracks.playlist.iter().cloned().collect();
+                    player_tx
+                        .send(PlayerCommand::SetPickedPlaylist(
+                            PickedPlaylist::InsertNext(picked)
+                        ))
+                        .ok();
+                    ui_state.tracks.clear_picked();
+                }
             }
             AppCommand::SelectItem => {
                 let mut ui_state = state.ui_state.borrow_mut();
@@ -543,6 +568,19 @@ fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>) {
                     code: KeyCode::Tab, ..
                 } => {
                     tx.send(AppCommand::SelectItem).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('a'),
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                } => {
+                    tx.send(AppCommand::AppendItem).ok();
+                }
+                KeyEvent {
+                    code: KeyCode::Char('i'),
+                    ..
+                } => {
+                    tx.send(AppCommand::InsertItem).ok();
                 }
                 KeyEvent {
                     code: KeyCode::Char('a'),
