@@ -97,7 +97,7 @@ impl<'a, const N: usize> CollapsibleWidgetGroup<'a, N> {
         index: usize,
         collapse_size: u16,
     ) -> Self {
-        assert_eq!(widgets.len(), N, "Widgets count must match N");
+        debug_assert_eq!(widgets.len(), N, "Widgets count must match N");
         Self {
             widgets,
             index,
