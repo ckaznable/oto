@@ -68,7 +68,7 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             Span::styled("H/L", Style::default().fg(theme.media_title)),
             Span::styled(">", Style::default().fg(theme.overlay0)),
             Span::styled("  <", Style::default().fg(theme.overlay0)),
-            Span::styled("J/K", Style::default().fg(theme.media_title)),
+            Span::styled("C-j/k", Style::default().fg(theme.media_title)),
             Span::styled(">", Style::default().fg(theme.overlay0)),
             Span::styled(" <", Style::default().fg(theme.overlay0)),
             Span::styled("q", Style::default().fg(theme.media_title)),
