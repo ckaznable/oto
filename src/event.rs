@@ -59,6 +59,7 @@ pub enum AppCommand {
     DeviceUpdate((i32, i32)),
     TogglePickerMode,
     EditEvent(Event),
+    UpdateFiltered(Vec<usize>),
 }
 
 #[derive(Clone)]
@@ -66,4 +67,10 @@ pub enum MprisCommand {
     TrackUpdate(TrackMeta, MediaSpec),
     PlayBackStateUpdate(f64, bool),
     VolumeUpdate(u8),
+}
+
+#[derive(Clone)]
+pub enum MatcherCommand {
+    Search(String),
+    PlaylistUpdate(PlayList),
 }

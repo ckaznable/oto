@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
 };
 
-use crate::tui::{collapsible::CollapsibleWidget, scrollbar, AppState, KeyHandleMode};
+use crate::tui::{AppState, KeyHandleMode, collapsible::CollapsibleWidget, scrollbar};
 
 pub struct Search;
 
@@ -23,14 +23,7 @@ impl CollapsibleWidget<AppState> for Search {
             ui_state.search.input.value().to_string()
         };
 
-        let list_len = {
-            let ui_state = state.ui_state.borrow();
-            if ui_state.search.filtered_indices.is_empty() {
-                playlist.list.len()
-            } else {
-                ui_state.search.filtered_indices.len()
-            }
-        };
+        let list_len = { state.ui_state.borrow().search.filtered_indices.len() };
         let cursor_index = state.ui_state.borrow().search.cursor_index;
         let scroll_state = state.ui_state.borrow().search.scroll_state;
 
@@ -74,19 +67,18 @@ impl CollapsibleWidget<AppState> for Search {
 
         state.cache.borrow_mut().list_items.clear();
 
-        let filtered_indices: Vec<usize> = {
-            let ui_state = state.ui_state.borrow();
-            ui_state.search.filtered_indices
-                .iter()
-                .skip(offset)
-                .take(visible_height)
-                .copied()
-                .collect()
-        };
-
-        for (i, track_idx) in filtered_indices.iter().enumerate() {
+        let ui_state = state.ui_state.borrow();
+        for (i, track_idx) in ui_state
+            .search
+            .filtered_indices
+            .iter()
+            .skip(offset)
+            .take(visible_height)
+            .copied()
+            .enumerate()
+        {
             let actual_index = offset + i;
-            let track = playlist.list.get(*track_idx);
+            let track = playlist.list.get(track_idx);
 
             if let Some(track) = track {
                 let title = track.title.clone().unwrap_or_else(|| "Unknown".to_string());
@@ -115,6 +107,7 @@ impl CollapsibleWidget<AppState> for Search {
             }
         }
 
+        drop(ui_state);
         drop(playlist);
 
         let mut cache = state.cache.borrow_mut();

@@ -1,5 +1,5 @@
 use crate::{
-    event::{CursorMove, PickedPlaylist},
+    event::{CursorMove, MatcherCommand, PickedPlaylist},
     media::MediaStore,
     tui::state::CursorMovable,
 };
@@ -13,7 +13,7 @@ use std::{
     sync::{
         Arc,
         atomic::{self, AtomicU8},
-        mpsc::{Receiver, Sender},
+        mpsc::{Receiver, Sender, channel},
     },
     time::{Duration, Instant},
 };
@@ -167,7 +167,10 @@ pub fn tui(
         enclose!((tx, player_tx) move || handle_keypress(tx, player_tx, key_handle_mode)),
     );
 
-    ratatui::run(move |t| app(t, tx, rx, player_tx, picker, state))?;
+    let (matcher_tx, matcher_rx) = channel();
+    std::thread::spawn(enclose!((tx) move || matcher(tx, matcher_rx)));
+
+    ratatui::run(move |t| app(t, tx, rx, player_tx, matcher_tx, picker, state))?;
     Ok(())
 }
 
@@ -176,6 +179,7 @@ fn app(
     tx: Sender<AppCommand>,
     rx: Receiver<AppCommand>,
     player_tx: Sender<PlayerCommand>,
+    matcher_tx: Sender<MatcherCommand>,
     picker: Picker,
     state: AppState,
 ) -> anyhow::Result<()> {
@@ -244,7 +248,12 @@ fn app(
                     ui_state.tracks.tree_by_album = by_album;
                 }
 
-                ui_state.search.filtered_indices = (0..list.list.len()).collect();
+                if ui_state.search.filtered_indices.len() != list.list.len() {
+                    ui_state.search.filtered_indices = (0..list.list.len()).collect();
+                    matcher_tx
+                        .send(MatcherCommand::PlaylistUpdate(list.clone()))
+                        .ok();
+                }
                 drop(ui_state);
 
                 *state.playlist.borrow_mut() = list;
@@ -432,18 +441,58 @@ fn app(
                     .map(|c| c.reload());
             }
             AppCommand::EditEvent(event) => {
-                state
-                    .ui_state
-                    .borrow_mut()
-                    .search
-                    .input
-                    .handle_event(&event);
+                let mut ui_state = state.ui_state.borrow_mut();
+                ui_state.search.input.handle_event(&event);
+                matcher_tx
+                    .send(MatcherCommand::Search(
+                        ui_state.search.input.value().to_owned(),
+                    ))
+                    .ok();
+            }
+            AppCommand::UpdateFiltered(indices) => {
+                let mut ui_state = state.ui_state.borrow_mut();
+                if matches!(
+                    CollapseWidgets::get(ui_state.expand_index),
+                    CollapseWidgets::Search
+                ) {
+                    ui_state.search.filtered_indices = indices;
+                }
             }
         }
 
         if force_render || timer.elapsed() >= min_refresh_duration {
             terminal.draw(enclose!((state) move |f| render(f, state)))?;
             timer = Instant::now();
+        }
+    }
+}
+
+fn matcher(tx: Sender<AppCommand>, rx: Receiver<MatcherCommand>) {
+    let mut playlist = PlayList::default();
+
+    loop {
+        match rx.recv() {
+            Err(_) => break,
+            Ok(MatcherCommand::Search(query)) => {
+                let list: Vec<usize> = (0..playlist.list.len())
+                    .filter(|idx| {
+                        playlist.list.get(*idx).is_some_and(|track| {
+                            track.title.as_ref().is_some_and(|s| s.contains(&query))
+                                || track.artist.as_ref().is_some_and(|s| s.contains(&query))
+                                || track
+                                    .album
+                                    .name
+                                    .as_ref()
+                                    .is_some_and(|s| s.contains(&query))
+                        })
+                    })
+                    .collect();
+
+                tx.send(AppCommand::UpdateFiltered(list)).ok();
+            }
+            Ok(MatcherCommand::PlaylistUpdate(list)) => {
+                playlist = list;
+            }
         }
     }
 }
@@ -481,7 +530,12 @@ fn render(frame: &mut Frame, mut state: AppState) {
     frame.render_stateful_widget(StateBar, bottom, &mut state);
 }
 
-fn handle_app_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>, event: KeyEvent, mode: Arc<AtomicU8>) {
+fn handle_app_keypress(
+    tx: Sender<AppCommand>,
+    player_tx: Sender<PlayerCommand>,
+    event: KeyEvent,
+    mode: Arc<AtomicU8>,
+) {
     match event {
         KeyEvent {
             code: KeyCode::Char('q'),
@@ -666,6 +720,20 @@ fn handle_edit_keypress(tx: Sender<AppCommand>, event: Event, mode: Arc<AtomicU8
             } => {
                 mode.store(KeyHandleMode::App as u8, atomic::Ordering::Relaxed);
                 tx.send(AppCommand::SubmitItem).ok();
+            }
+            KeyEvent {
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1))).ok();
+            }
+            KeyEvent {
+                code: KeyCode::Char('p'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1))).ok();
             }
             event => {
                 tx.send(AppCommand::EditEvent(Event::Key(event))).ok();
