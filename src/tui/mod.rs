@@ -726,14 +726,16 @@ fn handle_edit_keypress(tx: Sender<AppCommand>, event: Event, mode: Arc<AtomicU8
                 modifiers: KeyModifiers::CONTROL,
                 ..
             } => {
-                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1))).ok();
+                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1)))
+                    .ok();
             }
             KeyEvent {
                 code: KeyCode::Char('p'),
                 modifiers: KeyModifiers::CONTROL,
                 ..
             } => {
-                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1))).ok();
+                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1)))
+                    .ok();
             }
             event => {
                 tx.send(AppCommand::EditEvent(Event::Key(event))).ok();
