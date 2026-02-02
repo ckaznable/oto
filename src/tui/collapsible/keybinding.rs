@@ -24,6 +24,8 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             ("K", "Volume up"),
             ("<c-j>", "Next panel"),
             ("<c-k>", "Previous panel"),
+            ("/", "Search mode"),
+            ("<Esc>", "Exit search"),
             ("a", "Toggle Artist / Album"),
             ("<CR>", "Select item"),
             ("<Tab>", "Pick item"),
@@ -72,10 +74,10 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             Span::styled("  <", Style::default().fg(theme.overlay0)),
             Span::styled("c-j/k", Style::default().fg(theme.media_title)),
             Span::styled(">", Style::default().fg(theme.overlay0)),
+            Span::styled(" Quit ", Style::default().fg(theme.subtext0)),
             Span::styled(" <", Style::default().fg(theme.overlay0)),
             Span::styled("q", Style::default().fg(theme.media_title)),
             Span::styled(">", Style::default().fg(theme.overlay0)),
-            Span::styled(" Quit", Style::default().fg(theme.subtext0)),
         ])
         .style(Style::default().bg(theme.surface0))
         .render(area, buf);
