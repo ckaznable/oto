@@ -1,3 +1,5 @@
+use ratatui::crossterm::event::Event;
+
 use crate::{
     devices::PlaybackPCM,
     media::{MediaSpec, TrackMeta},
@@ -56,6 +58,7 @@ pub enum AppCommand {
     DevicesList(Vec<PlaybackPCM>),
     DeviceUpdate((i32, i32)),
     TogglePickerMode,
+    EditEvent(Event),
 }
 
 #[derive(Clone)]

@@ -1,16 +1,14 @@
 use ratatui::{
-    layout::{Constraint, Layout, Margin},
+    layout::{Constraint, Layout},
     prelude::*,
     text::Span,
-    widgets::{
-        Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation, ScrollbarState,
-        StatefulWidget, Widget,
-    },
+    widgets::{Block, Borders, List, ListItem, ScrollbarState, StatefulWidget, Widget},
 };
 
 use crate::media::TracksTree;
 use crate::tui::{
     collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
+    scrollbar,
     state::TracksMode,
     AppState,
 };
@@ -367,19 +365,7 @@ fn render_list_with_scrollbar(
 
     scroll_state = scroll_state.content_length(list_len).position(cursor_index);
 
-    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-        .begin_symbol(None)
-        .end_symbol(None)
-        .track_symbol(Some("│"))
-        .thumb_symbol("█")
-        .style(Style::default().fg(theme.overlay0));
-
-    StatefulWidget::render(
-        scrollbar,
-        scrollbar_area.inner(Margin::new(0, 0)),
-        buf,
-        &mut scroll_state,
-    );
+    scrollbar::render_scrollbar(scrollbar_area, buf, theme, &mut scroll_state);
     scroll_state
 }
 

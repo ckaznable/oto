@@ -2,42 +2,45 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders},
 };
-use strum::EnumCount;
+use strum::{EnumCount, FromRepr};
 
 use crate::tui::{
+    AppState,
     collapsible::{
-        devices_list::DevicesList, keybinding::KeyBinding, queue_list::QueueList,
+        devices_list::DevicesList, keybinding::KeyBinding, queue_list::QueueList, search::Search,
         tracks_picker::TracksPicker,
     },
-    AppState,
 };
 
 pub mod devices_list;
 pub mod keybinding;
 pub mod queue_list;
+pub mod search;
 pub mod tracks_picker;
 
-#[derive(EnumCount, Clone, Copy)]
+#[derive(EnumCount, Clone, Copy, FromRepr)]
+#[repr(u8)]
 pub enum CollapseWidgets {
     QueueList,
     TrackPicker,
+    Search,
     DevicesList,
     KeyBinding,
 }
 
 impl CollapseWidgets {
     pub fn get(index: usize) -> Self {
-        match index {
-            0 => Self::QueueList,
-            1 => Self::TrackPicker,
-            2 => Self::DevicesList,
-            3 => Self::KeyBinding,
-            _ => Self::QueueList,
-        }
+        Self::from_repr(index as u8).unwrap_or(Self::QueueList)
     }
 
     pub fn widgets<'a>() -> &'a [&'a dyn CollapsibleWidget<AppState>; Self::COUNT] {
-        &[&QueueList, &TracksPicker, &DevicesList, &KeyBinding]
+        &[
+            &QueueList,
+            &TracksPicker,
+            &Search,
+            &DevicesList,
+            &KeyBinding,
+        ]
     }
 }
 

@@ -1,11 +1,11 @@
 use ratatui::{
-    layout::{Constraint, Layout, Margin},
+    layout::{Constraint, Layout},
     prelude::*,
     text::Span,
-    widgets::{List, ListItem, Scrollbar, ScrollbarOrientation, StatefulWidget, Widget},
+    widgets::{List, ListItem, Widget},
 };
 
-use crate::tui::{collapsible::CollapsibleWidget, AppState};
+use crate::tui::{collapsible::CollapsibleWidget, scrollbar, AppState};
 
 pub struct DevicesList;
 
@@ -96,19 +96,7 @@ impl CollapsibleWidget<AppState> for DevicesList {
         let mut scroll_state = state.ui_state.borrow().devices.scroll_state;
         scroll_state = scroll_state.position(cursor_index);
 
-        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(None)
-            .end_symbol(None)
-            .track_symbol(Some("│"))
-            .thumb_symbol("█")
-            .style(Style::default().fg(theme.overlay0));
-
-        StatefulWidget::render(
-            scrollbar,
-            scrollbar_area.inner(Margin::new(0, 0)),
-            buf,
-            &mut scroll_state,
-        );
+        scrollbar::render_scrollbar(scrollbar_area, buf, theme, &mut scroll_state);
 
         state.ui_state.borrow_mut().devices.scroll_state = scroll_state;
     }

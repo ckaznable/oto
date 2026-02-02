@@ -17,6 +17,7 @@ pub struct CacheState {
     pub tracks_items: Vec<(Line<'static>, bool)>,
 }
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
+use tui_input::Input;
 
 use crate::{event::CursorMove, media::TracksTree, tui::image::UnCachedProtocol};
 
@@ -381,11 +382,54 @@ impl TracksState {
 }
 
 #[derive(Default)]
+pub struct SearchState {
+    pub input: Input,
+    pub cursor_index: usize,
+    pub scroll_state: ScrollbarState,
+    pub filtered_indices: Vec<usize>,
+}
+
+impl CursorMovable for SearchState {
+    fn cursor_index(&self) -> usize {
+        self.cursor_index
+    }
+
+    fn set_cursor_index(&mut self, index: usize) {
+        self.cursor_index = index;
+    }
+
+    fn set_scroll_position(&mut self, position: usize) {
+        self.scroll_state = self.scroll_state.position(position);
+    }
+}
+
+impl SearchState {
+    pub fn set_content_length(&mut self, len: usize) {
+        self.scroll_state = self.scroll_state.content_length(len);
+    }
+
+    pub fn cursor(&self) -> usize {
+        self.cursor_index
+    }
+
+    pub fn request(&self) {
+        todo!()
+    }
+
+    pub fn update(&mut self, indices: Vec<usize>) {
+        self.filtered_indices = indices;
+        self.cursor_index = 0;
+        self.scroll_state = ScrollbarState::default().content_length(self.filtered_indices.len());
+    }
+}
+
+#[derive(Default)]
 pub struct UiState {
     pub queue: QueueState,
     pub devices: DevicesListState,
     pub media_info: MediaInfoState,
     pub cover: Option<UnCachedProtocol>,
     pub tracks: TracksState,
+    pub search: SearchState,
     pub expand_index: usize,
 }

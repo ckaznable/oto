@@ -3,10 +3,10 @@ use ratatui::{
     layout::{Constraint, Layout, Margin},
     prelude::*,
     text::Span,
-    widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, StatefulWidget, Table, Widget},
+    widgets::{Cell, Row, Table, Widget},
 };
 
-use crate::tui::{AppState, LAYOUT_WIDTH_S, collapsible::CollapsibleWidget};
+use crate::tui::{collapsible::CollapsibleWidget, scrollbar, AppState, LAYOUT_WIDTH_S};
 
 pub struct QueueList;
 
@@ -167,19 +167,7 @@ impl CollapsibleWidget<AppState> for QueueList {
         let mut scroll_state = state.ui_state.borrow().queue.scroll_state;
         scroll_state = scroll_state.position(cursor_index);
 
-        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(None)
-            .end_symbol(None)
-            .track_symbol(Some("│"))
-            .thumb_symbol("█")
-            .style(Style::default().fg(theme.overlay0));
-
-        StatefulWidget::render(
-            scrollbar,
-            scrollbar_area.inner(Margin::new(0, 0)),
-            buf,
-            &mut scroll_state,
-        );
+        scrollbar::render_scrollbar(scrollbar_area, buf, theme, &mut scroll_state);
 
         state.ui_state.borrow_mut().queue.scroll_state = scroll_state;
     }
