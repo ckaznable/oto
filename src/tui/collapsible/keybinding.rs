@@ -81,10 +81,9 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             cache
                 .spans
                 .push(Span::styled(" 󱫉 <", Style::default().fg(theme.overlay0)));
-            cache.spans.push(Span::styled(
-                "Tab",
-                Style::default().fg(theme.media_title),
-            ));
+            cache
+                .spans
+                .push(Span::styled("Tab", Style::default().fg(theme.media_title)));
             cache
                 .spans
                 .push(Span::styled(">", Style::default().fg(theme.overlay0)));
@@ -101,10 +100,9 @@ impl CollapsibleWidget<AppState> for KeyBinding {
             cache
                 .spans
                 .push(Span::styled("  <", Style::default().fg(theme.overlay0)));
-            cache.spans.push(Span::styled(
-                "i",
-                Style::default().fg(theme.media_title),
-            ));
+            cache
+                .spans
+                .push(Span::styled("i", Style::default().fg(theme.media_title)));
             cache
                 .spans
                 .push(Span::styled(">", Style::default().fg(theme.overlay0)));
