@@ -9,13 +9,14 @@ use rustc_hash::FxBuildHasher;
 type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
 pub type PickedPlaylistRef = Rc<RefCell<FxIndexSet<usize>>>;
 
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 
 #[derive(Default)]
 pub struct CacheState {
     pub rows: Vec<Row<'static>>,
     pub list_items: Vec<ListItem<'static>>,
     pub tracks_items: Vec<(Line<'static>, bool)>,
+    pub spans: Vec<Span<'static>>,
 }
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use tui_input::Input;
