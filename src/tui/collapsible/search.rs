@@ -151,7 +151,7 @@ impl CollapsibleWidget<AppState> for Search {
         };
 
         Line::from(Span::styled(display_text, Style::default().fg(theme.text)))
-            .style(Style::default().bg(theme.collapse_queue_bg))
+            .style(Style::default().bg(theme.surface2))
             .render(area, buf);
     }
 }
