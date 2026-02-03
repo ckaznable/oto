@@ -37,7 +37,8 @@ itertools = "0.14.0"
 tui-input = "0.15.0"
 nucleo-matcher = "0.3.1"
 wana_kana = "4.0.0"
-lindera = { version = "2.0.0", features = ["embed-ipadic"] }
+lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", default-features = false, features = ["embed-ipadic", "compress"] }
+libc = "0.2.180"
 
 [profile.release]
 opt-level = 3

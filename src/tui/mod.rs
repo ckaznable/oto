@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use enclose::enclose;
 use itertools::Either;
 use lindera::{
-    dictionary::load_dictionary, mode::Mode, segmenter::Segmenter, tokenizer::Tokenizer,
+    dictionary::{DictionaryKind, load_dictionary_temporary}, mode::Mode, segmenter::Segmenter, tokenizer::Tokenizer,
 };
 use nucleo_matcher::{
     Matcher,
@@ -553,13 +553,17 @@ fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver
                         s.insert_str(0, r);
                     }
                 });
+
+                unsafe {
+                    libc::malloc_trim(0);
+                }
             }
         }
     }
 }
 
 fn kanji_to_romaji(tx: Sender<MatcherCommand>, playlist: &[TrackMeta]) {
-    let dictionary = load_dictionary("embedded://ipadic").unwrap();
+    let dictionary = load_dictionary_temporary(DictionaryKind::IPADIC).unwrap();
     let segmenter = Segmenter::new(Mode::Normal, dictionary, None);
     let tokenizer = Arc::new(Tokenizer::new(segmenter));
 

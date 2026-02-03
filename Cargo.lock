@@ -2289,9 +2289,9 @@ checksum = "7a79a3332a6609480d7d0c9eab957bca6b455b91bb84e66d19f5ff66294b85b8"
 
 [[package]]
 name = "libc"
-version = "0.2.178"
+version = "0.2.180"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
+checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -2323,8 +2323,7 @@ dependencies = [
 [[package]]
 name = "lindera"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27f30fef95690ce3fafdaeff287d00b00e66c15518777e2fc6b3992f26796540"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2355,8 +2354,7 @@ dependencies = [
 [[package]]
 name = "lindera-cc-cedict"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55262f1a81e62784d920666cdf212bd75aec2514e2325a54358a5ec928bb0334"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2371,8 +2369,7 @@ dependencies = [
 [[package]]
 name = "lindera-dictionary"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4f046fa26929c1a864821e215b8804def2ee9c2e9b096ef5c46b623e4b365ec"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2405,8 +2402,7 @@ dependencies = [
 [[package]]
 name = "lindera-ipadic"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4db8c10eb7f441890adb40ff951a0572096735d3598263c21b6d214358086085"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2421,8 +2417,7 @@ dependencies = [
 [[package]]
 name = "lindera-ipadic-neologd"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4748383ad732993ebcbe8a8825998f48e016eed43eb2b5ea5862c55fff8383d"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2437,8 +2432,7 @@ dependencies = [
 [[package]]
 name = "lindera-ko-dic"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9485489b67ef8973762d7fa25b1e1db0b4d308b4cdfcf3b30bb89343dae1f38"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2453,8 +2447,7 @@ dependencies = [
 [[package]]
 name = "lindera-unidic"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a55db1c6865d2b6493c7d11247482d35d5cd0c05705649b5f45ed6e9c2e8350"
+source = "git+https://github.com/ckaznable/lindera.git?rev=123e69b5f4235c7c07748e3b3180aa7e1245e56c#123e69b5f4235c7c07748e3b3180aa7e1245e56c"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2964,6 +2957,7 @@ dependencies = [
  "image",
  "indexmap",
  "itertools 0.14.0",
+ "libc",
  "lindera",
  "lofty",
  "log",
