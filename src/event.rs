@@ -59,7 +59,7 @@ pub enum AppCommand {
     DeviceUpdate((i32, i32)),
     TogglePickerMode,
     EditEvent(Event),
-    UpdateFiltered(Vec<usize>),
+    UpdateFiltered(String, Vec<usize>),
 }
 
 #[derive(Clone)]
@@ -71,6 +71,6 @@ pub enum MprisCommand {
 
 #[derive(Clone)]
 pub enum MatcherCommand {
-    Search(String),
+    Search(String, Option<Vec<usize>>),
     PlaylistUpdate(PlayList),
 }

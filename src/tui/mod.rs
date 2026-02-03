@@ -5,6 +5,11 @@ use crate::{
 };
 use anyhow::anyhow;
 use enclose::enclose;
+use itertools::Either;
+use nucleo_matcher::{
+    Matcher,
+    pattern::{AtomKind, CaseMatching, Normalization, Pattern},
+};
 use ratatui_image::picker::Picker;
 use std::{
     cell::{Cell, RefCell},
@@ -168,7 +173,7 @@ pub fn tui(
     );
 
     let (matcher_tx, matcher_rx) = channel();
-    std::thread::spawn(enclose!((tx) move || matcher(tx, matcher_rx)));
+    std::thread::spawn(enclose!((tx, matcher_tx) move || matcher(matcher_tx, tx, matcher_rx)));
 
     ratatui::run(move |t| app(t, tx, rx, player_tx, matcher_tx, picker, state))?;
     Ok(())
@@ -446,16 +451,19 @@ fn app(
                 matcher_tx
                     .send(MatcherCommand::Search(
                         ui_state.search.input.value().to_owned(),
+                        None,
                     ))
                     .ok();
             }
-            AppCommand::UpdateFiltered(indices) => {
+            AppCommand::UpdateFiltered(query, indices) => {
                 let mut ui_state = state.ui_state.borrow_mut();
                 if matches!(
                     CollapseWidgets::get(ui_state.expand_index),
                     CollapseWidgets::Search
-                ) {
+                ) && query == ui_state.search.input.value()
+                {
                     ui_state.search.filtered_indices = indices;
+                    force_render = true;
                 }
             }
         }
@@ -467,31 +475,70 @@ fn app(
     }
 }
 
-fn matcher(tx: Sender<AppCommand>, rx: Receiver<MatcherCommand>) {
-    let mut playlist = PlayList::default();
+struct MatcherItem<'a> {
+    search: &'a str,
+    index: usize,
+}
+
+impl<'a> AsRef<str> for MatcherItem<'a> {
+    fn as_ref(&self) -> &str {
+        self.search
+    }
+}
+
+fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver<MatcherCommand>) {
+    let mut playlist: Vec<String> = vec![];
+    let mut config = nucleo_matcher::Config::DEFAULT;
+    config.ignore_case = true;
+    let mut matcher = Matcher::new(config);
 
     loop {
         match rx.recv() {
             Err(_) => break,
-            Ok(MatcherCommand::Search(query)) => {
-                let list: Vec<usize> = (0..playlist.list.len())
-                    .filter(|idx| {
-                        playlist.list.get(*idx).is_some_and(|track| {
-                            track.title.as_ref().is_some_and(|s| s.contains(&query))
-                                || track.artist.as_ref().is_some_and(|s| s.contains(&query))
-                                || track
-                                    .album
-                                    .name
-                                    .as_ref()
-                                    .is_some_and(|s| s.contains(&query))
-                        })
-                    })
-                    .collect();
+            Ok(MatcherCommand::Search(query, limited)) => {
+                let iter = match limited {
+                    Some(ref limited) => Either::Left(
+                        limited
+                            .iter()
+                            .filter_map(|i| playlist.get(*i))
+                            .enumerate()
+                            .map(|(index, search)| MatcherItem { index, search }),
+                    ),
+                    None => Either::Right(
+                        playlist
+                            .iter()
+                            .enumerate()
+                            .map(|(index, search)| MatcherItem { index, search }),
+                    ),
+                };
 
-                tx.send(AppCommand::UpdateFiltered(list)).ok();
+                let list: Vec<usize> = Pattern::new(
+                    &query,
+                    CaseMatching::Ignore,
+                    Normalization::Smart,
+                    AtomKind::Fuzzy,
+                )
+                .match_list(iter, &mut matcher)
+                .iter()
+                .map(|(m, _)| m.index)
+                .collect();
+
+                tx.send(AppCommand::UpdateFiltered(query, list)).ok();
             }
             Ok(MatcherCommand::PlaylistUpdate(list)) => {
-                playlist = list;
+                playlist = list
+                    .list
+                    .iter()
+                    .cloned()
+                    .map(|track| {
+                        format!(
+                            "{}-{}-{}",
+                            track.artist.unwrap_or_default(),
+                            track.album.name.unwrap_or_default(),
+                            track.title.unwrap_or_default()
+                        )
+                    })
+                    .collect();
             }
         }
     }
