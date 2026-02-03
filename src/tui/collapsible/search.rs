@@ -86,6 +86,11 @@ impl CollapsibleWidget<AppState> for Search {
                     .artist
                     .clone()
                     .unwrap_or_else(|| "Unknown".to_string());
+                let album = track
+                    .album
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| "Unknown".to_string());
 
                 let is_cursor = actual_index == cursor_index;
                 let bg_color = if is_cursor {
@@ -100,6 +105,8 @@ impl CollapsibleWidget<AppState> for Search {
                     Span::styled(title, Style::default().fg(theme.queue_title)),
                     Span::styled(" - ", Style::default().fg(theme.overlay0)),
                     Span::styled(artist, Style::default().fg(theme.queue_album)),
+                    Span::styled(" - ", Style::default().fg(theme.overlay0)),
+                    Span::styled(album, Style::default().fg(theme.queue_album)),
                 ]);
 
                 let item = ListItem::new(line).style(Style::default().bg(bg_color));

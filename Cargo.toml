@@ -36,6 +36,8 @@ rustc-hash = "2.1.1"
 itertools = "0.14.0"
 tui-input = "0.15.0"
 nucleo-matcher = "0.3.1"
+wana_kana = "4.0.0"
+lindera = { version = "2.0.0", features = ["embed-ipadic"] }
 
 [profile.release]
 opt-level = 3

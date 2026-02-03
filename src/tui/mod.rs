@@ -6,11 +6,15 @@ use crate::{
 use anyhow::anyhow;
 use enclose::enclose;
 use itertools::Either;
+use lindera::{
+    dictionary::load_dictionary, mode::Mode, segmenter::Segmenter, tokenizer::Tokenizer,
+};
 use nucleo_matcher::{
     Matcher,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
 use ratatui_image::picker::Picker;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     cell::{Cell, RefCell},
     io::stdout,
@@ -24,6 +28,7 @@ use std::{
 };
 use strum::{Display, EnumCount, FromRepr};
 use tui_input::backend::crossterm::EventHandler;
+use wana_kana::{ConvertJapanese, IsJapaneseChar};
 
 use ratatui::{
     DefaultTerminal, Frame,
@@ -363,11 +368,6 @@ fn app(
                             ui_state.tracks.clear_picked();
                         }
                     }
-                    CollapseWidgets::Search => {
-                        ui_state.search.input.reset();
-
-                        // TODO submit
-                    }
                     _ => (),
                 };
             }
@@ -488,6 +488,7 @@ impl<'a> AsRef<str> for MatcherItem<'a> {
 
 fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver<MatcherCommand>) {
     let mut playlist: Vec<String> = vec![];
+
     let mut config = nucleo_matcher::Config::DEFAULT;
     config.ignore_case = true;
     let mut matcher = Matcher::new(config);
@@ -500,8 +501,7 @@ fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver
                     Some(ref limited) => Either::Left(
                         limited
                             .iter()
-                            .filter_map(|i| playlist.get(*i))
-                            .enumerate()
+                            .filter_map(|i| Some((*i, playlist.get(*i)?)))
                             .map(|(index, search)| MatcherItem { index, search }),
                     ),
                     None => Either::Right(
@@ -526,6 +526,10 @@ fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver
                 tx.send(AppCommand::UpdateFiltered(query, list)).ok();
             }
             Ok(MatcherCommand::PlaylistUpdate(list)) => {
+                std::thread::spawn(
+                    enclose!((self_tx, list) move || kanji_to_romaji(self_tx, &list.list)),
+                );
+
                 playlist = list
                     .list
                     .iter()
@@ -533,15 +537,74 @@ fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver
                     .map(|track| {
                         format!(
                             "{}-{}-{}",
+                            track.title.unwrap_or_default(),
                             track.artist.unwrap_or_default(),
                             track.album.name.unwrap_or_default(),
-                            track.title.unwrap_or_default()
                         )
                     })
                     .collect();
             }
+            Ok(MatcherCommand::KanjiToRomaji(romaji)) => {
+                playlist.iter_mut().enumerate().for_each(|(i, s)| {
+                    if let Some(Some(r)) = romaji.get(i)
+                        && !r.is_empty()
+                    {
+                        s.insert(0, ' ');
+                        s.insert_str(0, r);
+                    }
+                });
+            }
         }
     }
+}
+
+fn kanji_to_romaji(tx: Sender<MatcherCommand>, playlist: &[TrackMeta]) {
+    let dictionary = load_dictionary("embedded://ipadic").unwrap();
+    let segmenter = Segmenter::new(Mode::Normal, dictionary, None);
+    let tokenizer = Arc::new(Tokenizer::new(segmenter));
+
+    let processed_data: Vec<Option<String>> = playlist
+        .par_iter()
+        .map(|track| {
+            let tokenizer = Arc::clone(&tokenizer);
+
+            let text = format!(
+                "{}-{}-{}",
+                track.title.as_deref().unwrap_or(""),
+                track.artist.as_deref().unwrap_or(""),
+                track.album.name.as_deref().unwrap_or(""),
+            );
+
+            convert_to_romaji(&text, &tokenizer)
+        })
+        .collect();
+
+    tx.send(MatcherCommand::KanjiToRomaji(processed_data)).ok();
+}
+
+fn convert_to_romaji(text: &str, tokenizer: &Tokenizer) -> Option<String> {
+    if !text
+        .chars()
+        .any(|s| s.is_kanji() || s.is_hiragana() || s.is_katakana())
+    {
+        return None;
+    }
+
+    if !text.chars().any(|s| s.is_kanji()) {
+        return Some(text.to_romaji());
+    }
+
+    let tokens = tokenizer.tokenize(text).unwrap_or_default();
+    let mut reading = String::with_capacity(text.len() * 2);
+
+    for mut token in tokens {
+        let details = token.get_detail(7);
+        if let Some(d) = details {
+            reading.push_str(d);
+        }
+    }
+
+    Some(reading.to_romaji())
 }
 
 fn render(frame: &mut Frame, mut state: AppState) {
@@ -756,17 +819,11 @@ fn handle_edit_keypress(tx: Sender<AppCommand>, event: Event, mode: Arc<AtomicU8
     match event {
         Event::Key(event) => match event {
             KeyEvent {
-                code: KeyCode::Esc, ..
-            } => {
-                mode.store(KeyHandleMode::App as u8, atomic::Ordering::Relaxed);
-                tx.send(AppCommand::Rerender(true)).ok();
-            }
-            KeyEvent {
-                code: KeyCode::Enter,
+                code: KeyCode::Esc | KeyCode::Enter,
                 ..
             } => {
                 mode.store(KeyHandleMode::App as u8, atomic::Ordering::Relaxed);
-                tx.send(AppCommand::SubmitItem).ok();
+                tx.send(AppCommand::Rerender(true)).ok();
             }
             KeyEvent {
                 code: KeyCode::Char('n'),

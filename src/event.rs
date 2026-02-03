@@ -73,4 +73,5 @@ pub enum MprisCommand {
 pub enum MatcherCommand {
     Search(String, Option<Vec<usize>>),
     PlaylistUpdate(PlayList),
+    KanjiToRomaji(Vec<Option<String>>),
 }
