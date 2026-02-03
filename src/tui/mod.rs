@@ -276,28 +276,15 @@ fn app(
                 let index = state.ui_state.borrow().expand_index;
                 let mut ui_state = state.ui_state.borrow_mut();
 
-                force_render = match CollapseWidgets::get(index) {
-                    CollapseWidgets::QueueList => {
-                        let len = state.playlist.borrow().list.len();
-                        ui_state.queue.move_cursor(steps, len)
-                    }
-                    CollapseWidgets::TrackPicker => {
-                        if let Some(len) = ui_state.tracks.len() {
-                            ui_state.tracks.move_cursor(steps, len)
-                        } else {
-                            false
-                        }
-                    }
-                    CollapseWidgets::DevicesList => {
-                        let len = state.devices.borrow().len();
-                        ui_state.devices.move_cursor(steps, len)
-                    }
-                    CollapseWidgets::Search => {
-                        let len = ui_state.search.filtered_indices.len();
-                        ui_state.search.move_cursor(steps, len)
-                    }
-                    CollapseWidgets::KeyBinding => false,
+                let len = match CollapseWidgets::get(index) {
+                    CollapseWidgets::QueueList => Some(state.playlist.borrow().list.len()),
+                    CollapseWidgets::TrackPicker => ui_state.tracks.len(),
+                    CollapseWidgets::DevicesList => Some(state.devices.borrow().len()),
+                    CollapseWidgets::Search => Some(ui_state.search.filtered_indices.len()),
+                    CollapseWidgets::KeyBinding => None,
                 };
+
+                force_render = len.is_some_and(|len| ui_state.move_cursor(steps, len));
             }
             AppCommand::MoveCollapseCursor(steps) => {
                 force_render = true;
@@ -328,7 +315,7 @@ fn app(
                 }
             }
             AppCommand::SubmitItem => {
-                let mut ui_state = state.ui_state.borrow_mut();
+                let ui_state = state.ui_state.borrow_mut();
                 match CollapseWidgets::get(ui_state.expand_index) {
                     CollapseWidgets::QueueList => {
                         let index = ui_state.queue.cursor_index;
@@ -357,52 +344,72 @@ fn app(
                             player_tx.send(PlayerCommand::SetDevice(d)).ok();
                         }
                     }
-                    CollapseWidgets::TrackPicker => {
-                        if !ui_state.tracks.playlist.is_empty() {
-                            let picked = ui_state.tracks.playlist.iter().cloned().collect();
+                    CollapseWidgets::TrackPicker | CollapseWidgets::Search => {
+                        let playlist = ui_state.picked_playlist.borrow();
+                        if !playlist.is_empty() {
+                            let picked = playlist.iter().cloned().collect();
+                            drop(playlist);
                             player_tx
                                 .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Picked(
                                     picked,
                                 )))
                                 .ok();
-                            ui_state.tracks.clear_picked();
+                            ui_state.picked_playlist.borrow_mut().clear();
                         }
                     }
                     _ => (),
                 };
             }
             AppCommand::AppendItem => {
-                let mut ui_state = state.ui_state.borrow_mut();
-                if let CollapseWidgets::TrackPicker = CollapseWidgets::get(ui_state.expand_index) {
-                    let picked = ui_state.tracks.playlist.iter().cloned().collect();
+                let ui_state = state.ui_state.borrow();
+                if matches!(
+                    CollapseWidgets::get(ui_state.expand_index),
+                    CollapseWidgets::TrackPicker | CollapseWidgets::Search
+                ) {
+                    let picked = ui_state.picked_playlist.borrow().iter().cloned().collect();
                     player_tx
                         .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Append(
                             picked,
                         )))
                         .ok();
-                    ui_state.tracks.clear_picked();
+                    ui_state.picked_playlist.borrow_mut().clear();
                 }
             }
             AppCommand::InsertItem => {
-                let mut ui_state = state.ui_state.borrow_mut();
-                if let CollapseWidgets::TrackPicker = CollapseWidgets::get(ui_state.expand_index) {
-                    let picked = ui_state.tracks.playlist.iter().cloned().collect();
+                let ui_state = state.ui_state.borrow();
+                if matches!(
+                    CollapseWidgets::get(ui_state.expand_index),
+                    CollapseWidgets::TrackPicker | CollapseWidgets::Search
+                ) {
+                    let picked = ui_state.picked_playlist.borrow().iter().cloned().collect();
                     player_tx
                         .send(PlayerCommand::SetPickedPlaylist(
                             PickedPlaylist::InsertNext(picked),
                         ))
                         .ok();
-                    ui_state.tracks.clear_picked();
+                    ui_state.picked_playlist.borrow_mut().clear();
                 }
             }
             AppCommand::SelectItem => {
                 let mut ui_state = state.ui_state.borrow_mut();
-                if matches!(
-                    CollapseWidgets::get(ui_state.expand_index),
-                    CollapseWidgets::TrackPicker
-                ) {
-                    ui_state.tracks.pick();
-                    force_render = true;
+                match CollapseWidgets::get(ui_state.expand_index) {
+                    CollapseWidgets::TrackPicker => {
+                        ui_state.tracks.pick();
+                        force_render = true;
+                    }
+                    CollapseWidgets::Search => {
+                        let cursor = ui_state.search.cursor_index;
+                        if let Some(&track_idx) = ui_state.search.filtered_indices.get(cursor) {
+                            let mut playlist = ui_state.picked_playlist.borrow_mut();
+                            if playlist.contains(&track_idx) {
+                                playlist.shift_remove(&track_idx);
+                            } else {
+                                playlist.insert(track_idx);
+                            }
+                        }
+                        force_render = true;
+                    }
+                    _ => (),
                 }
             }
             AppCommand::ImageEncodeResult(result) => {

@@ -68,6 +68,7 @@ impl CollapsibleWidget<AppState> for Search {
         state.cache.borrow_mut().list_items.clear();
 
         let ui_state = state.ui_state.borrow();
+        let picked_playlist = ui_state.search.playlist.borrow();
         for (i, track_idx) in ui_state
             .search
             .filtered_indices
@@ -79,6 +80,7 @@ impl CollapsibleWidget<AppState> for Search {
         {
             let actual_index = offset + i;
             let track = playlist.list.get(track_idx);
+            let is_picked = picked_playlist.contains(&track_idx);
 
             if let Some(track) = track {
                 let title = track.title.clone().unwrap_or_else(|| "Unknown".to_string());
@@ -99,9 +101,13 @@ impl CollapsibleWidget<AppState> for Search {
                     theme.base
                 };
                 let indicator = if is_cursor { ">" } else { " " };
+                let picked_indicator = if is_picked { "*" } else { "" };
 
                 let line = Line::from(vec![
-                    Span::styled(format!("{indicator} "), Style::default().fg(theme.text)),
+                    Span::styled(
+                        format!("{indicator} {picked_indicator}"),
+                        Style::default().fg(theme.mode_playing_fg),
+                    ),
                     Span::styled(title, Style::default().fg(theme.queue_title)),
                     Span::styled(" - ", Style::default().fg(theme.overlay0)),
                     Span::styled(artist, Style::default().fg(theme.queue_album)),
@@ -114,6 +120,7 @@ impl CollapsibleWidget<AppState> for Search {
             }
         }
 
+        drop(picked_playlist);
         drop(ui_state);
         drop(playlist);
 

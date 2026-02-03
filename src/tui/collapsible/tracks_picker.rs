@@ -223,7 +223,13 @@ impl CollapsibleWidget<AppState> for TrackList {
                 .get(idx)
                 .and_then(|t| t.title.clone())
                 .unwrap_or_else(|| "Unknown".to_string());
-            let is_selected = state.ui_state.borrow().tracks.playlist.contains(&idx);
+            let is_selected = state
+                .ui_state
+                .borrow()
+                .tracks
+                .playlist
+                .borrow()
+                .contains(&idx);
             state
                 .cache
                 .borrow_mut()
@@ -254,37 +260,38 @@ impl CollapsibleWidget<AppState> for PlaylistList {
     }
 
     fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-        let ui_state = state.ui_state.borrow();
-        let playlist_indices = &ui_state.tracks.playlist;
-        let cursor_index = ui_state.tracks.playlist_index;
-        let scroll_state = ui_state.tracks.playlist_scroll;
+        let (cursor_index, scroll_state) = {
+            let ui_state = state.ui_state.borrow();
+            let playlist_indices = ui_state.tracks.playlist.borrow();
+            let cursor_index = ui_state.tracks.playlist_index;
+            let scroll_state = ui_state.tracks.playlist_scroll;
 
-        let app_playlist = state.playlist.borrow();
-        state.cache.borrow_mut().tracks_items.clear();
+            let app_playlist = state.playlist.borrow();
+            state.cache.borrow_mut().tracks_items.clear();
 
-        for &idx in playlist_indices.iter() {
-            let name = app_playlist.list.get(idx).map(|t| {
-                let theme = &state.theme;
-                let title = t.title.as_deref().unwrap_or("Unknown").to_string();
-                let artist = t.artist.as_deref().unwrap_or("Unknown").to_string();
-                let album = t.album.name.as_deref().unwrap_or("Unknown").to_string();
+            for &idx in playlist_indices.iter() {
+                let name = app_playlist.list.get(idx).map(|t| {
+                    let theme = &state.theme;
+                    let title = t.title.as_deref().unwrap_or("Unknown").to_string();
+                    let artist = t.artist.as_deref().unwrap_or("Unknown").to_string();
+                    let album = t.album.name.as_deref().unwrap_or("Unknown").to_string();
 
-                Line::from(vec![
-                    Span::styled(title, Style::default().fg(theme.text).bold()),
-                    Span::raw(" - "),
-                    Span::styled(artist, Style::default().fg(theme.mode_playing_fg)),
-                    Span::raw(" - "),
-                    Span::styled(album, Style::default().fg(theme.media_title)),
-                ])
-            });
+                    Line::from(vec![
+                        Span::styled(title, Style::default().fg(theme.text).bold()),
+                        Span::raw(" - "),
+                        Span::styled(artist, Style::default().fg(theme.mode_playing_fg)),
+                        Span::raw(" - "),
+                        Span::styled(album, Style::default().fg(theme.media_title)),
+                    ])
+                });
 
-            if let Some(line) = name {
-                state.cache.borrow_mut().tracks_items.push((line, false));
+                if let Some(line) = name {
+                    state.cache.borrow_mut().tracks_items.push((line, false));
+                }
             }
-        }
 
-        drop(ui_state);
-        drop(app_playlist);
+            (cursor_index, scroll_state)
+        };
 
         let new_scroll = render_list_with_scrollbar(
             area,

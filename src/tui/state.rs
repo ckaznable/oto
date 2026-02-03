@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{cell::RefCell, io::Cursor, rc::Rc};
 
 use anyhow::Result;
 use image::ImageReader;
@@ -7,6 +7,7 @@ use ratatui::widgets::{ListItem, Row, ScrollbarState};
 use rustc_hash::FxBuildHasher;
 
 type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
+pub type PickedPlaylistRef = Rc<RefCell<FxIndexSet<usize>>>;
 
 use ratatui::text::Line;
 
@@ -197,11 +198,10 @@ pub enum TracksMode {
     Album,
 }
 
-#[derive(Default)]
 pub struct TracksState {
     pub tree_by_artist: TracksTree,
     pub tree_by_album: TracksTree,
-    pub playlist: FxIndexSet<usize>,
+    pub playlist: PickedPlaylistRef,
     pub primary_index: usize,
     pub secondary_index: usize,
     pub track_index: usize,
@@ -212,6 +212,26 @@ pub struct TracksState {
     pub track_scroll: ScrollbarState,
     pub playlist_scroll: ScrollbarState,
     pub mode: TracksMode,
+}
+
+impl TracksState {
+    pub fn new(playlist: PickedPlaylistRef) -> Self {
+        Self {
+            tree_by_artist: TracksTree::default(),
+            tree_by_album: TracksTree::default(),
+            playlist,
+            primary_index: 0,
+            secondary_index: 0,
+            track_index: 0,
+            playlist_index: 0,
+            expand_index: 0,
+            primary_scroll: ScrollbarState::default(),
+            secondary_scroll: ScrollbarState::default(),
+            track_scroll: ScrollbarState::default(),
+            playlist_scroll: ScrollbarState::default(),
+            mode: TracksMode::default(),
+        }
+    }
 }
 
 impl CursorMovable for TracksState {
@@ -258,7 +278,7 @@ impl TracksState {
     }
 
     pub fn remove_from_playlist(&mut self) {
-        self.playlist.shift_remove_index(self.playlist_index);
+        self.playlist.borrow_mut().shift_remove_index(self.playlist_index);
     }
 
     pub fn pick_all_primary(&mut self, remove: bool) -> Option<()> {
@@ -274,11 +294,12 @@ impl TracksState {
             .flat_map(|(_, v)| v.iter().copied())
             .collect();
 
+        let mut playlist = self.playlist.borrow_mut();
         for idx in indices {
             if remove {
-                self.playlist.shift_remove(&idx);
+                playlist.shift_remove(&idx);
             } else {
-                self.playlist.insert(idx);
+                playlist.insert(idx);
             }
         }
 
@@ -298,11 +319,12 @@ impl TracksState {
             .1
             .clone();
 
+        let mut playlist = self.playlist.borrow_mut();
         for idx in indices {
             if remove {
-                self.playlist.shift_remove(&idx);
+                playlist.shift_remove(&idx);
             } else {
-                self.playlist.insert(idx);
+                playlist.insert(idx);
             }
         }
 
@@ -322,10 +344,11 @@ impl TracksState {
             .1
             .get(self.track_index)?;
 
-        if self.playlist.contains(idx) {
-            self.playlist.shift_remove(idx);
+        let mut playlist = self.playlist.borrow_mut();
+        if playlist.contains(idx) {
+            playlist.shift_remove(idx);
         } else {
-            self.playlist.insert(*idx);
+            playlist.insert(*idx);
         }
         Some(())
     }
@@ -349,7 +372,7 @@ impl TracksState {
                 .get(self.secondary_index)?
                 .1
                 .len(),
-            _ => self.playlist.len(),
+            _ => self.playlist.borrow().len(),
         };
 
         Some(len)
@@ -357,9 +380,10 @@ impl TracksState {
 
     pub fn is_primary_selected(&self, index: usize) -> bool {
         let tree = self.current_tree();
+        let playlist = self.playlist.borrow();
         if let Some((_, secondary_list)) = tree.get(index) {
             secondary_list.iter().all(|(_, track_indices)| {
-                track_indices.iter().all(|idx| self.playlist.contains(idx))
+                track_indices.iter().all(|idx| playlist.contains(idx))
             })
         } else {
             false
@@ -368,25 +392,38 @@ impl TracksState {
 
     pub fn is_secondary_selected(&self, index: usize) -> bool {
         let tree = self.current_tree();
+        let playlist = self.playlist.borrow();
         if let Some((_, items)) = tree.get(self.primary_index)
             && let Some((_, track_indices)) = items.get(index)
         {
-            return track_indices.iter().all(|idx| self.playlist.contains(idx));
+            return track_indices.iter().all(|idx| playlist.contains(idx));
         }
         false
     }
 
     pub fn clear_picked(&mut self) {
-        self.playlist.clear();
+        self.playlist.borrow_mut().clear();
     }
 }
 
-#[derive(Default)]
 pub struct SearchState {
     pub input: Input,
     pub cursor_index: usize,
     pub scroll_state: ScrollbarState,
     pub filtered_indices: Vec<usize>,
+    pub playlist: PickedPlaylistRef,
+}
+
+impl SearchState {
+    pub fn new(playlist: PickedPlaylistRef) -> Self {
+        Self {
+            input: Input::default(),
+            cursor_index: 0,
+            scroll_state: ScrollbarState::default(),
+            filtered_indices: Vec::new(),
+            playlist,
+        }
+    }
 }
 
 impl CursorMovable for SearchState {
@@ -423,7 +460,6 @@ impl SearchState {
     }
 }
 
-#[derive(Default)]
 pub struct UiState {
     pub queue: QueueState,
     pub devices: DevicesListState,
@@ -432,4 +468,53 @@ pub struct UiState {
     pub tracks: TracksState,
     pub search: SearchState,
     pub expand_index: usize,
+    pub picked_playlist: PickedPlaylistRef,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        let picked_playlist: PickedPlaylistRef = Rc::new(RefCell::new(FxIndexSet::default()));
+        Self {
+            queue: QueueState::default(),
+            devices: DevicesListState::default(),
+            media_info: MediaInfoState::default(),
+            cover: None,
+            tracks: TracksState::new(Rc::clone(&picked_playlist)),
+            search: SearchState::new(Rc::clone(&picked_playlist)),
+            expand_index: 0,
+            picked_playlist,
+        }
+    }
+}
+
+impl CursorMovable for UiState {
+    fn cursor_index(&self) -> usize {
+        match self.expand_index {
+            0 => self.queue.cursor_index(),
+            1 => self.tracks.cursor_index(),
+            2 => self.search.cursor_index(),
+            3 => self.devices.cursor_index(),
+            _ => 0,
+        }
+    }
+
+    fn set_cursor_index(&mut self, index: usize) {
+        match self.expand_index {
+            0 => self.queue.set_cursor_index(index),
+            1 => self.tracks.set_cursor_index(index),
+            2 => self.search.set_cursor_index(index),
+            3 => self.devices.set_cursor_index(index),
+            _ => {}
+        }
+    }
+
+    fn set_scroll_position(&mut self, position: usize) {
+        match self.expand_index {
+            0 => self.queue.set_scroll_position(position),
+            1 => self.tracks.set_scroll_position(position),
+            2 => self.search.set_scroll_position(position),
+            3 => self.devices.set_scroll_position(position),
+            _ => {}
+        }
+    }
 }
