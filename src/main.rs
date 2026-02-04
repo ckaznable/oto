@@ -1,7 +1,7 @@
 use gag::Redirect;
 use log::LevelFilter;
 use os_pipe::{PipeWriter, pipe};
-use simplelog::WriteLogger;
+use simplelog::{TermLogger, WriteLogger};
 use std::{
     io::{BufRead, BufReader},
     path::PathBuf,
@@ -55,6 +55,13 @@ fn main() -> Result<()> {
     match args.command {
         #[cfg(feature = "dict-jp")]
         cli::Commands::Init => {
+            TermLogger::init(
+                LevelFilter::Debug,
+                simplelog::Config::default(),
+                simplelog::TerminalMode::Mixed,
+                simplelog::ColorChoice::Auto
+            ).unwrap();
+
             if let Err(e) = oto::dict::download_and_build_dictionary(true) {
                 log::error!("{e}");
             }
