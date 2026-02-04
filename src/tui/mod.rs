@@ -6,15 +6,11 @@ use crate::{
 use anyhow::anyhow;
 use enclose::enclose;
 use itertools::Either;
-use lindera::{
-    dictionary::{DictionaryKind, load_dictionary_temporary}, mode::Mode, segmenter::Segmenter, tokenizer::Tokenizer,
-};
 use nucleo_matcher::{
     Matcher,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
 use ratatui_image::picker::Picker;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     cell::{Cell, RefCell},
     io::stdout,
@@ -28,7 +24,6 @@ use std::{
 };
 use strum::{Display, EnumCount, FromRepr};
 use tui_input::backend::crossterm::EventHandler;
-use wana_kana::{ConvertJapanese, IsJapaneseChar};
 
 use ratatui::{
     DefaultTerminal, Frame,
@@ -493,7 +488,7 @@ impl<'a> AsRef<str> for MatcherItem<'a> {
     }
 }
 
-fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver<MatcherCommand>) {
+fn matcher(_self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver<MatcherCommand>) {
     let mut playlist: Vec<String> = vec![];
 
     let mut config = nucleo_matcher::Config::DEFAULT;
@@ -533,8 +528,9 @@ fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver
                 tx.send(AppCommand::UpdateFiltered(query, list)).ok();
             }
             Ok(MatcherCommand::PlaylistUpdate(list)) => {
+                #[cfg(feature = "dict-jp")]
                 std::thread::spawn(
-                    enclose!((self_tx, list) move || kanji_to_romaji(self_tx, &list.list)),
+                    enclose!((_self_tx, list) move || crate::dict::kanji_to_romaji(_self_tx, &list.list)),
                 );
 
                 playlist = list
@@ -567,55 +563,6 @@ fn matcher(self_tx: Sender<MatcherCommand>, tx: Sender<AppCommand>, rx: Receiver
             }
         }
     }
-}
-
-fn kanji_to_romaji(tx: Sender<MatcherCommand>, playlist: &[TrackMeta]) {
-    let dictionary = load_dictionary_temporary(DictionaryKind::IPADIC).unwrap();
-    let segmenter = Segmenter::new(Mode::Normal, dictionary, None);
-    let tokenizer = Arc::new(Tokenizer::new(segmenter));
-
-    let processed_data: Vec<Option<String>> = playlist
-        .par_iter()
-        .map(|track| {
-            let tokenizer = Arc::clone(&tokenizer);
-
-            let text = format!(
-                "{}-{}-{}",
-                track.title.as_deref().unwrap_or(""),
-                track.artist.as_deref().unwrap_or(""),
-                track.album.name.as_deref().unwrap_or(""),
-            );
-
-            convert_to_romaji(&text, &tokenizer)
-        })
-        .collect();
-
-    tx.send(MatcherCommand::KanjiToRomaji(processed_data)).ok();
-}
-
-fn convert_to_romaji(text: &str, tokenizer: &Tokenizer) -> Option<String> {
-    if !text
-        .chars()
-        .any(|s| s.is_kanji() || s.is_hiragana() || s.is_katakana())
-    {
-        return None;
-    }
-
-    if !text.chars().any(|s| s.is_kanji()) {
-        return Some(text.to_romaji());
-    }
-
-    let tokens = tokenizer.tokenize(text).unwrap_or_default();
-    let mut reading = String::with_capacity(text.len() * 2);
-
-    for mut token in tokens {
-        let details = token.get_detail(7);
-        if let Some(d) = details {
-            reading.push_str(d);
-        }
-    }
-
-    Some(reading.to_romaji())
 }
 
 fn render(frame: &mut Frame, mut state: AppState) {

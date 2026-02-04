@@ -9,3 +9,6 @@ pub mod shared;
 pub mod tui;
 pub mod util;
 pub mod volume;
+
+#[cfg(feature = "dict-jp")]
+pub mod dict;

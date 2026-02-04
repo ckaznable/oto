@@ -11,13 +11,26 @@ clap = { version = "4.5", features = ["derive"] }
 directories = "6.0.0"
 enclose = "1.2.1"
 id3 = "1.16.3"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp"] }
+image = { version = "0.25", default-features = false, features = [
+  "png",
+  "jpeg",
+  "bmp",
+] }
 log = "0.4.29"
-ratatui = { version = "0.30.0", default-features = false, features = ["crossterm", "layout-cache", "macros", "unstable-widget-ref"] }
+ratatui = { version = "0.30.0", default-features = false, features = [
+  "crossterm",
+  "layout-cache",
+  "macros",
+  "unstable-widget-ref",
+] }
 ratatui-image = { git = "https://github.com/ckaznable/ratatui-image.git", rev = "673e0575cfcf140ab7f96fc1976e1b761f494c3d" }
 ringbuf = "0.4.8"
 simplelog = "0.12.2"
-symphonia = { version = "0.5.5", features = ["all-codecs", "opt-simd-sse", "opt-simd-avx"]}
+symphonia = { version = "0.5.5", features = [
+  "all-codecs",
+  "opt-simd-sse",
+  "opt-simd-avx",
+] }
 thiserror = "2.0.17"
 walkdir = "2.5.0"
 strum = { version = "0.27", features = ["derive"] }
@@ -36,9 +49,14 @@ rustc-hash = "2.1.1"
 itertools = "0.14.0"
 tui-input = "0.15.0"
 nucleo-matcher = "0.3.1"
-wana_kana = "4.0.0"
-lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", default-features = false, features = ["embed-ipadic", "compress"] }
-libc = "0.2.180"
+libc = "0.2"
+lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", default-features = false, optional = true }
+wana_kana = { version = "4.0.0", optional = true }
+tar = { version = "0.4", optional = true }
+flate2 = { version = "1.1.9", optional = true }
+md5 = { version = "0.8.0", optional = true }
+serde_json = { version = "1", optional = true }
+ureq = { version = "3", default-features = false, features = ["native-tls"], optional = true }
 
 [profile.release]
 opt-level = 3
@@ -47,3 +65,16 @@ codegen-units = 1
 panic = "abort"
 debug = false
 rpath = false
+
+[features]
+default = ["dict-jp"]
+dict-jp = [
+  "dep:lindera",
+  "dep:wana_kana",
+  "dep:ureq",
+  "dep:tar",
+  "dep:flate2",
+  "dep:md5",
+  "dep:serde_json",
+]
+dict-jp-embed = ["dict-jp", "lindera/embed-ipadic", "lindera/compress"]
