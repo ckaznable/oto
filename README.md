@@ -112,7 +112,7 @@ cargo build --release --features dict-jp-embed
 
 - [Amberol](https://gitlab.gnome.org/World/amberol) - A small and simple music player for GNOME
 - [rmpc](https://github.com/mierak/rmpc) - A beautiful MPD client for the terminal
-- [inori](https://github.com/eshrh/inori)
+- [inori](https://github.com/eshrh/inori) - A beautiful MPD client for the terminal and support fuzzy search
 
 ## License
 
