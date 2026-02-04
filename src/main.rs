@@ -53,6 +53,13 @@ fn main() -> Result<()> {
     let _mpris = mpris::Mpris::handle(player_tx.clone(), mpris_rx)?;
 
     match args.command {
+        #[cfg(feature = "dict-jp")]
+        cli::Commands::Init => {
+            if let Err(e) = oto::dict::download_and_build_dictionary(true) {
+                log::error!("{e}");
+            }
+            Ok(())
+        }
         cli::Commands::Play { path, device } => {
             spawn_mock_app_event_handler(app_rx);
             player_event_loop(

@@ -28,7 +28,7 @@ pub fn kanji_to_romaji(tx: Sender<MatcherCommand>, playlist: &[TrackMeta]) {
             .map_err(|e| anyhow::anyhow!(e.to_string()));
 
     #[cfg(not(feature = "dict-jp-embed"))]
-    let dictionary = download_and_build_dictionary();
+    let dictionary = download_and_build_dictionary(false);
 
     let dictionary = match dictionary {
         Ok(dictionary) => dictionary,
@@ -61,14 +61,19 @@ pub fn kanji_to_romaji(tx: Sender<MatcherCommand>, playlist: &[TrackMeta]) {
     tx.send(MatcherCommand::KanjiToRomaji(processed_data)).ok();
 }
 
-#[allow(dead_code)]
-fn download_and_build_dictionary() -> Result<Dictionary> {
+pub fn download_and_build_dictionary(force: bool) -> Result<Dictionary> {
     let input_path = PROJ_DIRS.data_dir().join("dict/input");
     let output_path = PROJ_DIRS.data_dir().join("dict/output");
+
+    if force {
+        std::fs::remove_dir_all(&input_path)?;
+        std::fs::remove_dir_all(&output_path)?;
+    }
+
     std::fs::create_dir_all(&input_path)?;
     std::fs::create_dir_all(&output_path)?;
 
-    if !input_path.join(DIR).exists() {
+    if force || !input_path.join(DIR).exists() {
         log::debug!("cache dict not found, downloading to cache dir");
         let config = ureq::config::Config::builder()
             .tls_config(
@@ -105,7 +110,7 @@ fn download_and_build_dictionary() -> Result<Dictionary> {
         builder.build_dictionary(&input_path.join(DIR), &output_path)?
     }
 
-    log::debug!("load dict from {output_path:?}");
+    log::info!("load dict from {output_path:?}");
     load_fs_dictionary(&output_path).map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 

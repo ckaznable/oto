@@ -11,6 +11,8 @@ pub struct Args {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    #[cfg(feature = "dict-jp")]
+    Init,
     Play {
         #[arg(short, long)]
         path: Option<PathBuf>,
