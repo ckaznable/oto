@@ -66,8 +66,12 @@ pub fn download_and_build_dictionary(force: bool) -> Result<Dictionary> {
     let output_path = PROJ_DIRS.data_dir().join("dict/output");
 
     if force {
-        std::fs::remove_dir_all(&input_path)?;
-        std::fs::remove_dir_all(&output_path)?;
+        if input_path.exists() {
+            std::fs::remove_dir_all(&input_path)?;
+        }
+        if output_path.exists() {
+            std::fs::remove_dir_all(&output_path)?;
+        }
     }
 
     std::fs::create_dir_all(&input_path)?;
