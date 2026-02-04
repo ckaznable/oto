@@ -222,9 +222,11 @@ fn app(
             }
             AppCommand::AppModeUpdate(mode) => {
                 state.app_mode.set(mode);
+                force_render = true;
             }
             AppCommand::VolumeUpdate(vol) => {
                 state.volume.set(vol);
+                force_render = true;
             }
             AppCommand::TrackUpdate(track, spec) => {
                 log::info!("playing: {:?}", &track);
