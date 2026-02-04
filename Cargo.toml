@@ -50,7 +50,7 @@ itertools = "0.14.0"
 tui-input = "0.15.0"
 nucleo-matcher = "0.3.1"
 libc = "0.2"
-lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", default-features = false, optional = true }
+lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", optional = true }
 wana_kana = { version = "4.0.0", optional = true }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1.1.9", optional = true }
@@ -77,4 +77,4 @@ dict-jp = [
   "dep:md5",
   "dep:serde_json",
 ]
-dict-jp-embed = ["dict-jp", "lindera/embed-ipadic", "lindera/compress"]
+dict-jp-embed = ["dict-jp", "lindera/embed-ipadic"]
