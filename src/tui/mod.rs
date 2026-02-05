@@ -218,13 +218,15 @@ fn app(
                     ui_state.tracks.tree_by_album = by_album;
                 }
 
-                if ui_state.search.filtered_indices.len() != list.list.len() {
+                let playlist = state.playlist.borrow();
+                if playlist.list.len() < list.list.len() {
                     ui_state.search.filtered_indices = (0..list.list.len()).collect();
                     matcher_tx
                         .send(MatcherCommand::PlaylistUpdate(list.clone()))
                         .ok();
                 }
                 drop(ui_state);
+                drop(playlist);
 
                 *state.playlist.borrow_mut() = list;
                 force_render = true;
