@@ -387,6 +387,10 @@ fn app(
                             .map(|p| p.update_resized_protocol(stateful_protocol));
                     }
                 }
+
+                unsafe {
+                    libc::malloc_trim(0);
+                }
             }
             AppCommand::DevicesList(devices) => {
                 log::info!("devices: {devices:?}");
