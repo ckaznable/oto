@@ -3,7 +3,7 @@ use std::{cell::RefCell, io::Cursor, rc::Rc};
 use anyhow::Result;
 use image::ImageReader;
 use indexmap::IndexSet;
-use ratatui::widgets::{ListItem, Row, ScrollbarState};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::{ListItem, Row, ScrollbarState, Widget}};
 use rustc_hash::FxBuildHasher;
 use strum::{Display, FromRepr};
 
@@ -67,6 +67,27 @@ pub struct CacheState {
     pub list_items: Vec<ListItem<'static>>,
     pub tracks_items: Vec<(Line<'static>, bool)>,
     pub spans: Vec<Span<'static>>,
+    pub line: Line<'static>,
+}
+
+impl CacheState {
+    pub fn line_ref(&self) -> &Line<'static> {
+        &self.line
+    }
+
+    pub fn render_line(&self, area: Rect, buf: &mut Buffer) {
+        self.line_ref().render(area, buf);
+    }
+
+    pub fn clear_line(&mut self) {
+        self.line.spans.clear();
+    }
+
+    pub fn push_spans(&mut self, spans: impl IntoIterator<Item = Span<'static>>) {
+        for item in spans.into_iter() {
+            self.line.spans.push(item);
+        }
+    }
 }
 
 #[derive(Default)]
