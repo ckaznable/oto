@@ -5,7 +5,10 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph, Widget},
 };
 
-use crate::tui::{AppState, KeyHandleMode, collapsible::CollapsibleWidget, scrollbar};
+use crate::{
+    arena_alloc,
+    tui::{collapsible::CollapsibleWidget, scrollbar, AppState, KeyHandleMode},
+};
 
 pub struct Search;
 
@@ -138,21 +141,27 @@ impl CollapsibleWidget<AppState> for Search {
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
+        let mut alloc = state.alloc.borrow_mut();
 
         let query = {
             let ui_state = state.ui_state.borrow();
             ui_state.search.input.value().to_string()
         };
 
-        let display_text = if query.is_empty() {
-            " 󰍉 Search".to_string()
+        let text_ptr = if query.is_empty() {
+            arena_alloc!(&mut alloc, " 󰍉 Search")
         } else {
-            format!(" 󰍉 Search: {}", query)
+            arena_alloc!(&mut alloc, " 󰍉 Search: {}", query)
         };
 
-        Line::from(Span::styled(display_text, Style::default().fg(theme.text)))
-            .style(Style::default().bg(theme.surface2))
-            .render(area, buf);
+        Line::from(Span::styled(
+            alloc.get(text_ptr),
+            Style::default().fg(theme.text),
+        ))
+        .style(Style::default().bg(theme.surface2))
+        .render(area, buf);
+
+        alloc.clear();
     }
 }
 

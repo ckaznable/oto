@@ -7,7 +7,7 @@ use crate::tui::{
 
 pub struct KeyBinding;
 
-const BINDINGS: [(&str, &str); 25] = [
+pub const BINDINGS: [(&str, &str); 25] = [
     ("<Space>", "Play / Pause"),
     ("H", "Previous track"),
     ("L", "Next track"),
@@ -35,34 +35,47 @@ const BINDINGS: [(&str, &str); 25] = [
     ("q", "Quit"),
 ];
 
+pub fn build_keybinding_keys() -> Vec<String> {
+    BINDINGS
+        .iter()
+        .map(|(key, _)| format!("{:>8}", key))
+        .collect()
+}
+
+pub fn build_keybinding_lines(theme: &crate::tui::theme::Theme) -> Vec<Line<'static>> {
+    let key_style = Style::default().fg(theme.media_title).bold();
+    let desc_style = Style::default().fg(theme.subtext0);
+    let separator_style = Style::default().fg(theme.overlay0);
+
+    let keys = build_keybinding_keys();
+
+    BINDINGS
+        .iter()
+        .zip(keys.iter())
+        .map(|((_, desc), key_formatted)| {
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(key_formatted.clone(), key_style),
+                Span::styled("  │  ", separator_style),
+                Span::styled(*desc, desc_style),
+            ])
+        })
+        .collect()
+}
+
 impl CollapsibleWidget<AppState> for KeyBinding {
     fn title(&self) -> Option<&'static str> {
         Some(" Keybinding ")
     }
 
     fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-        let theme = &state.theme;
+        let pre_render = state.pre_render.borrow();
 
-        let key_style = Style::default().fg(theme.media_title).bold();
-        let desc_style = Style::default().fg(theme.subtext0);
-        let separator_style = Style::default().fg(theme.overlay0);
-
-        let mut cache = state.cache.borrow_mut();
-
-        for (i, (key, desc)) in BINDINGS.iter().enumerate() {
+        for (i, line) in pre_render.keybinding_lines.iter().enumerate() {
             if i as u16 >= area.height {
                 break;
             }
 
-            cache.spans.clear();
-            cache.spans.push(Span::raw("  "));
-            cache
-                .spans
-                .push(Span::styled(format!("{:>8}", key), key_style));
-            cache.spans.push(Span::styled("  │  ", separator_style));
-            cache.spans.push(Span::styled(*desc, desc_style));
-
-            let line = Line::from(cache.spans.drain(..).collect::<Vec<_>>());
             let y = area.y + i as u16;
             line.render(Rect::new(area.x, y, area.width, 1), buf);
         }
@@ -71,106 +84,69 @@ impl CollapsibleWidget<AppState> for KeyBinding {
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
 
-        let mut cache = state.cache.borrow_mut();
-        cache.spans.clear();
+        let mut spans = Vec::new();
+        let widget = CollapseWidgets::get(state.ui_state.borrow().expand_index);
 
         if matches!(
-            CollapseWidgets::get(state.ui_state.borrow().expand_index),
+            widget,
             CollapseWidgets::TrackPicker | CollapseWidgets::Search
         ) {
-            cache
-                .spans
-                .push(Span::styled(" 󱫉 <", Style::default().fg(theme.overlay0)));
-            cache
-                .spans
-                .push(Span::styled("Tab", Style::default().fg(theme.media_title)));
-            cache
-                .spans
-                .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-            cache
-                .spans
-                .push(Span::styled(" 󰬳 <", Style::default().fg(theme.overlay0)));
-            cache.spans.push(Span::styled(
+            spans.push(Span::styled(" 󱫉 <", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled("Tab", Style::default().fg(theme.media_title)));
+            spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled(" 󰬳 <", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled(
                 "Enter",
                 Style::default().fg(theme.media_title),
             ));
-            cache
-                .spans
-                .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-            cache
-                .spans
-                .push(Span::styled("  <", Style::default().fg(theme.overlay0)));
-            cache
-                .spans
-                .push(Span::styled("i", Style::default().fg(theme.media_title)));
-            cache
-                .spans
-                .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-            cache
-                .spans
-                .push(Span::styled(" 󰨿 <", Style::default().fg(theme.overlay0)));
-            cache.spans.push(Span::styled(
+            spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled("  <", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled("i", Style::default().fg(theme.media_title)));
+            spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled(" 󰨿 <", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled(
                 "<c-a>",
                 Style::default().fg(theme.media_title),
             ));
-            cache
-                .spans
-                .push(Span::styled(">", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
         }
 
-        cache
-            .spans
-            .push(Span::styled(" 󰐎 <", Style::default().fg(theme.overlay0)));
-        cache.spans.push(Span::styled(
+        if matches!(widget, CollapseWidgets::TrackPicker) {
+            spans.push(Span::styled(" 󰘍 <", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled("h/l", Style::default().fg(theme.media_title)));
+            spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        }
+
+        if matches!(widget, CollapseWidgets::Search) {
+            spans.push(Span::styled("  <", Style::default().fg(theme.overlay0)));
+            spans.push(Span::styled("/", Style::default().fg(theme.media_title)));
+            spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        }
+
+        spans.push(Span::styled(" 󰐎 <", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled(
             "Space",
             Style::default().fg(theme.media_title),
         ));
-        cache
-            .spans
-            .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled(" 󰒮 󰒭 <", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled("H/L", Style::default().fg(theme.media_title)));
-        cache
-            .spans
-            .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled("   <", Style::default().fg(theme.overlay0)));
-        cache.spans.push(Span::styled(
+        spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled(" 󰒮 󰒭 <", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled("H/L", Style::default().fg(theme.media_title)));
+        spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled("   <", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled(
             "c-j/k",
             Style::default().fg(theme.media_title),
         ));
-        cache
-            .spans
-            .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled("  <", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled("j/k", Style::default().fg(theme.media_title)));
-        cache
-            .spans
-            .push(Span::styled(">", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled(" Quit ", Style::default().fg(theme.subtext0)));
-        cache
-            .spans
-            .push(Span::styled("<", Style::default().fg(theme.overlay0)));
-        cache
-            .spans
-            .push(Span::styled("q", Style::default().fg(theme.media_title)));
-        cache
-            .spans
-            .push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled("  <", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled("j/k", Style::default().fg(theme.media_title)));
+        spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled(" Quit ", Style::default().fg(theme.subtext0)));
+        spans.push(Span::styled("<", Style::default().fg(theme.overlay0)));
+        spans.push(Span::styled("q", Style::default().fg(theme.media_title)));
+        spans.push(Span::styled(">", Style::default().fg(theme.overlay0)));
 
-        let line = Line::from(cache.spans.drain(..).collect::<Vec<_>>());
-        line.style(Style::default().bg(theme.surface0))
-            .render(area, buf);
+        let line = Line::from(spans).style(Style::default().bg(theme.surface0));
+        line.render(area, buf);
     }
 }

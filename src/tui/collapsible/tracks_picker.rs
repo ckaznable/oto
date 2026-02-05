@@ -5,12 +5,15 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ScrollbarState, StatefulWidget, Widget},
 };
 
-use crate::media::TracksTree;
-use crate::tui::{
-    collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
-    scrollbar,
-    state::TracksMode,
-    AppState,
+use crate::{
+    arena_alloc,
+    media::TracksTree,
+    tui::{
+        collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
+        scrollbar,
+        state::TracksMode,
+        AppState,
+    },
 };
 
 pub struct TracksPicker;
@@ -78,6 +81,7 @@ impl CollapsibleWidget<AppState> for TracksPicker {
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
+        let mut alloc = state.alloc.borrow_mut();
         let playing_track = state.playing_track.borrow();
         let artist_name = playing_track.track.artist.as_deref().unwrap_or("Unknown");
         let album_name = playing_track
@@ -87,12 +91,15 @@ impl CollapsibleWidget<AppState> for TracksPicker {
             .as_deref()
             .unwrap_or("Unknown");
 
+        let text_ptr = arena_alloc!(&mut alloc, " 󰠃 {} 󰎆  {}", artist_name, album_name);
         Line::from(Span::styled(
-            format!(" 󰠃 {artist_name} 󰎆  {album_name}"),
+            alloc.get(text_ptr),
             Style::default().fg(theme.media_artist),
         ))
         .style(Style::default().bg(theme.collapse_queue_bg))
         .render(area, buf);
+
+        alloc.clear();
     }
 }
 
@@ -341,7 +348,7 @@ fn render_list_with_scrollbar(
         .collect();
     drop(cache_ref);
 
-    for (idx, text, is_selected) in items_to_render {
+    for (idx, mut text, is_selected) in items_to_render {
         let is_cursor = idx == cursor_index;
         let bg_color = if is_cursor {
             theme.surface1
@@ -357,10 +364,8 @@ fn render_list_with_scrollbar(
             Style::default().fg(text_color)
         };
 
-        let mut spans = vec![Span::styled(format!("{indicator} {prefix}"), prefix_style)];
-        spans.extend(text.spans);
-
-        let line = Line::from(spans);
+        text.spans.insert(0, Span::styled(format!("{indicator} {prefix}"), prefix_style));
+        let line = Line::from(text.spans);
 
         let item = ListItem::new(line).style(Style::default().bg(bg_color));
         state.cache.borrow_mut().list_items.push(item);

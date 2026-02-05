@@ -4,7 +4,7 @@ use ratatui::{
     widgets::{Block, Padding, Paragraph, Widget},
 };
 
-use crate::tui::AppState;
+use crate::{arena_alloc, tui::AppState};
 
 pub struct MediaInfo;
 
@@ -13,6 +13,7 @@ impl StatefulWidget for MediaInfo {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let theme = &state.theme;
+        let mut alloc = state.alloc.borrow_mut();
 
         let block = Block::default()
             .padding(Padding::uniform(1))
@@ -36,10 +37,11 @@ impl StatefulWidget for MediaInfo {
         let total_height = title_height + artist_height + album_height + spacing;
 
         if inner.height < total_height {
-            let text = format!("{}\n{}\n{}", title, artist, album);
-            Paragraph::new(text)
+            let text_ptr = arena_alloc!(&mut alloc, "{}\n{}\n{}", title, artist, album);
+            Paragraph::new(alloc.get(text_ptr))
                 .alignment(Alignment::Center)
                 .render(inner, buf);
+            alloc.clear();
             return;
         }
 
@@ -78,7 +80,8 @@ impl StatefulWidget for MediaInfo {
                 .alignment(Alignment::Center)
                 .render(areas[2], buf);
 
-            Paragraph::new(format!("by {}", artist))
+            let artist_ptr = arena_alloc!(&mut alloc, "by {}", artist);
+            Paragraph::new(alloc.get(artist_ptr))
                 .style(Style::default().fg(theme.media_artist))
                 .alignment(Alignment::Center)
                 .render(areas[4], buf);
@@ -88,5 +91,7 @@ impl StatefulWidget for MediaInfo {
                 .alignment(Alignment::Center)
                 .render(areas[6], buf);
         }
+
+        alloc.clear();
     }
 }

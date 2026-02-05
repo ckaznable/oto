@@ -210,7 +210,7 @@ fn player_event_loop(
                     output.pause(false)?;
                     mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
                         .ok();
-                    tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Playing))
+                    tx.send(AppCommand::AppModeUpdate(oto::tui::state::AppMode::Playing))
                         .ok();
                 }
                 PlayerCommand::Pause => {
@@ -221,7 +221,7 @@ fn player_event_loop(
                     output.pause(true)?;
                     mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
                         .ok();
-                    tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Paused))
+                    tx.send(AppCommand::AppModeUpdate(oto::tui::state::AppMode::Paused))
                         .ok();
                 }
                 PlayerCommand::PauseCycle => {
@@ -235,8 +235,8 @@ fn player_event_loop(
                     mtx.send(MprisCommand::PlayBackStateUpdate(current_time, !pause))
                         .ok();
                     tx.send(AppCommand::AppModeUpdate(match pause {
-                        true => oto::tui::AppMode::Paused,
-                        false => oto::tui::AppMode::Playing,
+                        true => oto::tui::state::AppMode::Paused,
+                        false => oto::tui::state::AppMode::Playing,
                     }))
                     .ok();
                 }
@@ -391,7 +391,7 @@ fn player_event_loop(
                 output.pause(true)?;
                 mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
                     .ok();
-                tx.send(AppCommand::AppModeUpdate(oto::tui::AppMode::Normal))
+                tx.send(AppCommand::AppModeUpdate(oto::tui::state::AppMode::Normal))
                     .ok();
             }
             init = true;

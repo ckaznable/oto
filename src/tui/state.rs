@@ -5,11 +5,61 @@ use image::ImageReader;
 use indexmap::IndexSet;
 use ratatui::widgets::{ListItem, Row, ScrollbarState};
 use rustc_hash::FxBuildHasher;
+use strum::{Display, FromRepr};
 
 type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
 pub type PickedPlaylistRef = Rc<RefCell<FxIndexSet<usize>>>;
 
 use ratatui::text::{Line, Span};
+
+#[derive(Clone, Copy, Default, FromRepr)]
+#[repr(u8)]
+pub enum KeyHandleMode {
+    #[default]
+    App = 0,
+    Edit = 1,
+}
+
+#[derive(Clone, Copy, Default, Display)]
+pub enum AppMode {
+    #[default]
+    Normal,
+    Playing,
+    Paused,
+}
+
+#[derive(Clone, Copy, Default)]
+pub enum PlayMode {
+    #[default]
+    Normal,
+    Loop,
+    LoopCurrent,
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct PlayingState {
+    pub current: f64,
+    pub duration: u64,
+}
+
+#[derive(Default)]
+pub struct PlayingTrack {
+    pub track: crate::media::TrackMeta,
+    pub spec: crate::media::MediaSpec,
+}
+
+#[derive(Default)]
+pub struct DevicesState {
+    pub list: Vec<crate::devices::PlaybackPCM>,
+    pub current: (i32, i32),
+}
+
+impl DevicesState {
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.list.iter().map(|p| p.devices.len()).sum()
+    }
+}
 
 #[derive(Default)]
 pub struct CacheState {
@@ -17,6 +67,12 @@ pub struct CacheState {
     pub list_items: Vec<ListItem<'static>>,
     pub tracks_items: Vec<(Line<'static>, bool)>,
     pub spans: Vec<Span<'static>>,
+}
+
+#[derive(Default)]
+pub struct PreRenderState {
+    pub keybinding_lines: Vec<Line<'static>>,
+    pub devices_lines: Vec<(ListItem<'static>, i32, i32)>,
 }
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use tui_input::Input;
@@ -279,7 +335,9 @@ impl TracksState {
     }
 
     pub fn remove_from_playlist(&mut self) {
-        self.playlist.borrow_mut().shift_remove_index(self.playlist_index);
+        self.playlist
+            .borrow_mut()
+            .shift_remove_index(self.playlist_index);
     }
 
     pub fn pick_all_primary(&mut self, remove: bool) -> Option<()> {
@@ -383,9 +441,9 @@ impl TracksState {
         let tree = self.current_tree();
         let playlist = self.playlist.borrow();
         if let Some((_, secondary_list)) = tree.get(index) {
-            secondary_list.iter().all(|(_, track_indices)| {
-                track_indices.iter().all(|idx| playlist.contains(idx))
-            })
+            secondary_list
+                .iter()
+                .all(|(_, track_indices)| track_indices.iter().all(|idx| playlist.contains(idx)))
         } else {
             false
         }

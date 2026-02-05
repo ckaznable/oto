@@ -5,7 +5,7 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::tui::AppState;
+use crate::{arena_alloc, tui::AppState};
 
 #[derive(Debug, Clone, Copy)]
 pub enum TriangleDirection {
@@ -90,19 +90,15 @@ impl TriangleSegment {
 }
 
 #[derive(Debug, Clone)]
-pub struct SegmentData {
-    pub content: String,
+pub struct SegmentData<'a> {
+    pub content: &'a str,
     pub fg: Color,
     pub bg: Color,
 }
 
-impl SegmentData {
-    pub fn new<S: Into<String>>(content: S, fg: Color, bg: Color) -> Self {
-        Self {
-            content: content.into(),
-            fg,
-            bg,
-        }
+impl<'a> SegmentData<'a> {
+    pub fn new(content: &'a str, fg: Color, bg: Color) -> Self {
+        Self { content, fg, bg }
     }
 }
 
@@ -111,8 +107,8 @@ pub struct TriangleSegmentGroup<T> {
     segments: T,
 }
 
-impl TriangleSegmentGroup<[SegmentData; 5]> {
-    pub fn new(segments: [SegmentData; 5]) -> Self {
+impl<'a> TriangleSegmentGroup<[SegmentData<'a>; 5]> {
+    pub fn new(segments: [SegmentData<'a>; 5]) -> Self {
         Self { segments }
     }
 
@@ -131,7 +127,7 @@ impl TriangleSegmentGroup<[SegmentData; 5]> {
                 tail_bg
             };
 
-            TriangleSegment::new(seg.content.clone())
+            TriangleSegment::new(seg.content)
                 .fg(seg.fg)
                 .bg(seg.bg)
                 .with_triangle(TriangleDirection::Right, next_bg)
@@ -146,9 +142,10 @@ impl StatefulWidget for StateBar {
     type State = AppState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let mut alloc = state.alloc.borrow_mut();
         let theme = &state.theme;
         let app_mode_str = state.app_mode.get().to_string();
-        let app_mode_formatted = format!(" {app_mode_str} ");
+        let app_mode_formatted_ptr = arena_alloc!(&mut alloc, " {app_mode_str} ");
 
         let vol_icon = match state.volume.get() {
             0 => "",
@@ -156,23 +153,31 @@ impl StatefulWidget for StateBar {
             _ => "",
         };
 
-        let vol_str = format!(" {} {}% ", vol_icon, state.volume.get());
+        let vol_str_ptr = arena_alloc!(&mut alloc, " {} {}% ", vol_icon, state.volume.get());
 
         let play_mode_icon = match state.play_mode.get() {
-            crate::tui::PlayMode::Normal => "➡",
-            crate::tui::PlayMode::Loop => "",
-            crate::tui::PlayMode::LoopCurrent => "",
+            crate::tui::state::PlayMode::Normal => "➡",
+            crate::tui::state::PlayMode::Loop => "",
+            crate::tui::state::PlayMode::LoopCurrent => "",
         };
-        let play_mode_str = format!(" {} ", play_mode_icon);
+        let play_mode_str_ptr = arena_alloc!(&mut alloc, " {} ", play_mode_icon);
 
         let track = state.playing_track.borrow();
         let sr = track.spec.sample_rate;
-        let sample_rate_str = if sr >= 1_000_000 {
-            format!(" {:.1}M ", (sr as f64 / 1_000_000.0 * 10.).trunc() / 10.)
+        let sample_rate_str_ptr = if sr >= 1_000_000 {
+            arena_alloc!(
+                &mut alloc,
+                " {:.1}M ",
+                (sr as f64 / 1_000_000.0 * 10.).trunc() / 10.
+            )
         } else if sr >= 1_000 {
-            format!(" {:.1}k ", (sr as f64 / 1_000.0 * 10.).trunc() / 10.)
+            arena_alloc!(
+                &mut alloc,
+                " {:.1}k ",
+                (sr as f64 / 1_000.0 * 10.).trunc() / 10.
+            )
         } else {
-            format!(" {}Hz ", sr)
+            arena_alloc!(&mut alloc, " {}Hz ", sr)
         };
 
         let sample_rate_color = if sr >= 2_822_400 {
@@ -187,16 +192,17 @@ impl StatefulWidget for StateBar {
         drop(track);
 
         let playing = state.playing.get();
-        let current_time = format!(
+        let current_time_ptr = arena_alloc!(
+            &mut alloc,
             " {:02}:{:02.0} ",
             (playing.current / 60.).floor(),
             (playing.current % 60.).floor()
         );
 
         let mode_color = match state.app_mode.get() {
-            crate::tui::AppMode::Normal => (theme.mode_normal_fg, theme.mode_normal_bg),
-            crate::tui::AppMode::Playing => (theme.mode_playing_fg, theme.mode_playing_bg),
-            crate::tui::AppMode::Paused => (theme.mode_paused_fg, theme.mode_paused_bg),
+            crate::tui::state::AppMode::Normal => (theme.mode_normal_fg, theme.mode_normal_bg),
+            crate::tui::state::AppMode::Playing => (theme.mode_playing_fg, theme.mode_playing_bg),
+            crate::tui::state::AppMode::Paused => (theme.mode_paused_fg, theme.mode_paused_bg),
         };
 
         let arrow_bg = if state.playing.get().current > 0. {
@@ -206,11 +212,23 @@ impl StatefulWidget for StateBar {
         };
 
         let group = TriangleSegmentGroup::new([
-            SegmentData::new(app_mode_formatted, mode_color.0, mode_color.1),
-            SegmentData::new(sample_rate_str, sample_rate_color, theme.sample_rate_bg),
-            SegmentData::new(vol_str, theme.text, theme.volume_bg),
-            SegmentData::new(play_mode_str, theme.playing_mode_fg, theme.playing_mode_bg),
-            SegmentData::new(current_time, theme.timer_fg, theme.timer_bg),
+            SegmentData::new(
+                alloc.get(app_mode_formatted_ptr),
+                mode_color.0,
+                mode_color.1,
+            ),
+            SegmentData::new(
+                alloc.get(sample_rate_str_ptr),
+                sample_rate_color,
+                theme.sample_rate_bg,
+            ),
+            SegmentData::new(alloc.get(vol_str_ptr), theme.text, theme.volume_bg),
+            SegmentData::new(
+                alloc.get(play_mode_str_ptr),
+                theme.playing_mode_fg,
+                theme.playing_mode_bg,
+            ),
+            SegmentData::new(alloc.get(current_time_ptr), theme.timer_fg, theme.timer_bg),
         ]);
 
         let mut constraints = group.constraints();
@@ -220,6 +238,8 @@ impl StatefulWidget for StateBar {
 
         group.render(&layout[0..5], buf, arrow_bg);
 
+        alloc.clear();
+        drop(alloc);
         ProgressBar.render(layout[5], buf, state);
     }
 }

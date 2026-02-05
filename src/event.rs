@@ -4,7 +4,7 @@ use crate::{
     devices::PlaybackPCM,
     media::{MediaSpec, TrackMeta},
     player::PlayList,
-    tui::{image::ProtocolLruResult, AppMode},
+    tui::{image::ProtocolLruResult, state::AppMode},
 };
 
 #[derive(Clone, Copy)]

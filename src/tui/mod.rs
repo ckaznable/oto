@@ -1,7 +1,8 @@
 use crate::{
+    alloc::StringArena,
     event::{CursorMove, MatcherCommand, PickedPlaylist},
     media::MediaStore,
-    tui::state::CursorMovable,
+    tui::state::{CacheState, CursorMovable},
 };
 use anyhow::anyhow;
 use enclose::enclose;
@@ -22,7 +23,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use strum::{Display, EnumCount, FromRepr};
+use strum::EnumCount;
 use tui_input::backend::crossterm::EventHandler;
 
 use ratatui::{
@@ -38,15 +39,16 @@ use ratatui::{
 };
 
 use crate::{
-    devices::PlaybackPCM,
     event::{AppCommand, PlayerCommand},
-    media::{MediaSpec, TrackMeta},
     player::PlayList,
     tui::{
         collapsible::{CollapseWidgets, CollapsibleWidgetGroup},
         image::LruProtocolFactory,
         media_info::MediaInfo,
-        state::UiState,
+        state::{
+            AppMode, DevicesState, KeyHandleMode, PlayMode, PlayingState, PlayingTrack,
+            PreRenderState, UiState,
+        },
         state_bar::StateBar,
         theme::Theme,
     },
@@ -63,57 +65,9 @@ pub mod theme;
 pub const LAYOUT_WIDTH_S: u16 = 65;
 pub const LAYOUT_WIDTH_L: u16 = 120;
 
-#[derive(Clone, Copy, Default, FromRepr)]
-#[repr(u8)]
-pub enum KeyHandleMode {
-    #[default]
-    App = 0,
-    Edit = 1,
-}
-
-#[derive(Clone, Copy, Default, Display)]
-pub enum AppMode {
-    #[default]
-    Normal,
-    Playing,
-    Paused,
-}
-
-#[derive(Clone, Copy, Default)]
-pub enum PlayMode {
-    #[default]
-    Normal,
-    Loop,
-    LoopCurrent,
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct PlayingState {
-    current: f64,
-    duration: u64,
-}
-
-#[derive(Default)]
-pub struct PlayingTrack {
-    track: TrackMeta,
-    spec: MediaSpec,
-}
-
-#[derive(Clone, Default)]
-pub struct DevicesState {
-    list: Vec<PlaybackPCM>,
-    current: (i32, i32),
-}
-
-impl DevicesState {
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize {
-        self.list.iter().map(|p| p.devices.len()).sum()
-    }
-}
-
 #[derive(Clone)]
 pub struct AppState {
+    alloc: Rc<RefCell<StringArena>>,
     app_mode: Rc<Cell<AppMode>>,
     play_mode: Rc<Cell<PlayMode>>,
     playing: Rc<Cell<PlayingState>>,
@@ -123,24 +77,33 @@ pub struct AppState {
     theme: Rc<Theme>,
     ui_state: Rc<RefCell<UiState>>,
     devices: Rc<RefCell<DevicesState>>,
-    cache: Rc<RefCell<state::CacheState>>,
+    cache: Rc<RefCell<CacheState>>,
     key_handle_mode: Arc<AtomicU8>,
+    pre_render: Rc<RefCell<PreRenderState>>,
 }
 
 impl AppState {
     fn new() -> Self {
+        let theme = Rc::new(Theme::default());
+        let keybinding_lines = crate::tui::collapsible::keybinding::build_keybinding_lines(&theme);
+
         Self {
+            theme,
+            alloc: Rc::new(RefCell::new(StringArena::new())),
             app_mode: Rc::new(Cell::new(AppMode::default())),
             play_mode: Rc::new(Cell::new(PlayMode::default())),
             playing: Rc::new(Cell::new(PlayingState::default())),
             playing_track: Rc::new(RefCell::new(PlayingTrack::default())),
             playlist: Rc::new(RefCell::new(PlayList::default())),
             volume: Rc::new(Cell::new(0)),
-            theme: Rc::new(Theme::default()),
             ui_state: Rc::new(RefCell::new(UiState::default())),
             devices: Rc::new(RefCell::new(Default::default())),
             cache: Rc::new(RefCell::new(state::CacheState::default())),
             key_handle_mode: Arc::new(AtomicU8::new(KeyHandleMode::default() as u8)),
+            pre_render: Rc::new(RefCell::new(PreRenderState {
+                keybinding_lines,
+                ..Default::default()
+            })),
         }
     }
 
@@ -425,8 +388,16 @@ fn app(
             }
             AppCommand::DevicesList(devices) => {
                 log::info!("devices: {devices:?}");
-                let mut d = state.devices.borrow_mut();
-                d.list = devices;
+                let mut mut_device_state = state.devices.borrow_mut();
+                mut_device_state.list = devices;
+                drop(mut_device_state);
+
+                let devices_state = state.devices.borrow();
+                let theme = &state.theme;
+                let lines = crate::tui::collapsible::devices_list::build_devices_lines(&devices_state, theme);
+                drop(devices_state);
+
+                state.pre_render.borrow_mut().devices_lines = lines;
             }
             AppCommand::DeviceUpdate(device) => {
                 log::info!("current device: {device:?}");

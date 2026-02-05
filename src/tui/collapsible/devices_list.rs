@@ -9,6 +9,53 @@ use crate::tui::{collapsible::CollapsibleWidget, scrollbar, AppState};
 
 pub struct DevicesList;
 
+pub fn build_devices_lines(
+    devices: &crate::tui::state::DevicesState,
+    theme: &crate::tui::theme::Theme,
+) -> Vec<(ListItem<'static>, i32, i32)> {
+    let flat_list: Vec<(i32, i32, String)> = devices
+        .list
+        .iter()
+        .flat_map(|pcm| {
+            let pcm_name = pcm.name.as_deref().unwrap_or("Unknown");
+            if pcm.devices.is_empty() {
+                vec![(pcm.index, 0, pcm_name.to_string())]
+            } else {
+                pcm.devices
+                    .iter()
+                    .map(|dev| {
+                        let dev_name = dev.name.as_deref().unwrap_or("Default");
+                        (pcm.index, dev.index, format!("{pcm_name} - {dev_name}"))
+                    })
+                    .collect()
+            }
+        })
+        .collect();
+
+    flat_list
+        .into_iter()
+        .map(|(pcm_idx, dev_idx, name)| {
+            let is_current = pcm_idx == devices.current.0 && dev_idx == devices.current.1;
+            let indicator = if is_current { ">" } else { " " };
+            let bg_color = if is_current {
+                theme.queue_current_bg
+            } else {
+                theme.base
+            };
+
+            let line = Line::from(vec![
+                Span::styled(
+                    format!("{indicator} "),
+                    Style::default().fg(theme.mode_playing_fg),
+                ),
+                Span::styled(name, Style::default().fg(theme.queue_title)),
+            ]);
+            let item = ListItem::new(line).style(Style::default().bg(bg_color));
+            (item, pcm_idx, dev_idx)
+        })
+        .collect()
+}
+
 impl CollapsibleWidget<AppState> for DevicesList {
     fn title(&self) -> Option<&'static str> {
         Some(" Devices ")
@@ -17,28 +64,8 @@ impl CollapsibleWidget<AppState> for DevicesList {
     fn render_expand(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
         let devices = state.devices.borrow();
-        let current_device = devices.current;
 
-        let flat_list: Vec<(i32, i32, String)> = devices
-            .list
-            .iter()
-            .flat_map(|pcm| {
-                let pcm_name = pcm.name.as_deref().unwrap_or("Unknown");
-                if pcm.devices.is_empty() {
-                    vec![(pcm.index, 0, pcm_name.to_string())]
-                } else {
-                    pcm.devices
-                        .iter()
-                        .map(|dev| {
-                            let dev_name = dev.name.as_deref().unwrap_or("Default");
-                            (pcm.index, dev.index, format!("{pcm_name} - {dev_name}"))
-                        })
-                        .collect()
-                }
-            })
-            .collect();
-
-        let list_len = flat_list.len();
+        let list_len = state.pre_render.borrow().devices_lines.len();
 
         let mut ui_state = state.ui_state.borrow_mut();
         ui_state.devices.set_content_length(list_len);
@@ -54,39 +81,27 @@ impl CollapsibleWidget<AppState> for DevicesList {
 
         state.cache.borrow_mut().list_items.clear();
 
-        let list_iter = flat_list
+        let pre_render = state.pre_render.borrow();
+        let list_iter = pre_render
+            .devices_lines
             .iter()
             .enumerate()
             .skip(offset)
             .take(visible_height);
 
-        for (index, (pcm_idx, dev_idx, name)) in list_iter {
-            let is_current = *pcm_idx == current_device.0 && *dev_idx == current_device.1;
+        for (index, (item, _, _)) in list_iter {
             let is_cursor = index == cursor_index;
 
-            let bg_color = if is_cursor {
-                theme.surface1
-            } else if is_current {
-                theme.queue_current_bg
+            let final_item = if is_cursor {
+                item.clone().style(Style::default().bg(theme.surface1))
             } else {
-                theme.base
+                item.clone()
             };
-
-            let indicator = if is_current { ">" } else { " " };
-
-            let line = Line::from(vec![
-                Span::styled(
-                    format!("{indicator} "),
-                    Style::default().fg(theme.mode_playing_fg),
-                ),
-                Span::styled(name.clone(), Style::default().fg(theme.queue_title)),
-            ]);
-
-            let item = ListItem::new(line).style(Style::default().bg(bg_color));
-            state.cache.borrow_mut().list_items.push(item);
+            state.cache.borrow_mut().list_items.push(final_item);
         }
 
         drop(devices);
+        drop(pre_render);
 
         let mut cache = state.cache.borrow_mut();
         let list = List::new(cache.list_items.drain(..));

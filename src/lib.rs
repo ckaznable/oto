@@ -1,3 +1,4 @@
+pub mod alloc;
 pub mod cli;
 pub mod decoder;
 pub mod devices;
