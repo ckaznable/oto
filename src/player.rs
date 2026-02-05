@@ -94,7 +94,10 @@ impl AudioOutput {
     pub fn pcm_sw_param(&self) -> Result<()> {
         let swp = self.inner.sw_params_current()?;
         let hwp = self.inner.hw_params_current()?;
-        swp.set_start_threshold(hwp.get_buffer_size().unwrap())?;
+
+        let frames = hwp.get_buffer_size().unwrap();
+        log::info!("set alsa buffer {frames} frames");
+        swp.set_start_threshold(frames)?;
         self.inner.sw_params(&swp)?;
         Ok(())
     }
