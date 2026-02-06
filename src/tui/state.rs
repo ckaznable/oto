@@ -3,7 +3,11 @@ use std::{cell::RefCell, io::Cursor, rc::Rc};
 use anyhow::Result;
 use image::ImageReader;
 use indexmap::IndexSet;
-use ratatui::{buffer::Buffer, layout::Rect, widgets::{ListItem, Row, ScrollbarState, Widget}};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    widgets::{ListItem, Row, ScrollbarState, Widget},
+};
 use rustc_hash::FxBuildHasher;
 use strum::{Display, FromRepr};
 
