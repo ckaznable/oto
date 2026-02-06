@@ -109,8 +109,13 @@ impl AudioOutput {
     }
 
     pub fn init(&self, spec: MediaSpec) -> Result<()> {
-        self.set_hw_param(spec)?;
-        self.set_sw_param(spec)?;
+        if let Err(e) = self.set_hw_param(spec) {
+            log::error!("{e}");
+        }
+
+        if let Err(e) = self.set_sw_param(spec) {
+            log::error!("{e}");
+        }
 
         let status = self.inner.status()?;
         if !matches!(
