@@ -80,6 +80,7 @@ fn main() -> Result<()> {
         cli::Commands::Tui { path, device } => {
             unsafe {
                 std::env::set_var("MALLOC_MMAP_THRESHOLD_", (1024 * 1024 * 2).to_string());
+                libc::mallopt(libc::M_MMAP_THRESHOLD, 1024 * 1024 * 2);
             }
 
             WriteLogger::init(
