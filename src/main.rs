@@ -273,6 +273,7 @@ fn player_event_loop(
                         output.prepare().ok();
 
                         let spec = player.spec.unwrap_or_default();
+                        output.init(spec).ok();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
                             .ok();
@@ -286,6 +287,7 @@ fn player_event_loop(
                         output.prepare().ok();
 
                         let spec = player.spec.unwrap_or_default();
+                        output.init(spec).ok();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
                             .ok();
@@ -299,6 +301,7 @@ fn player_event_loop(
                         output.prepare().ok();
 
                         let spec = player.spec.unwrap_or_default();
+                        output.init(spec).ok();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
                             .ok();
