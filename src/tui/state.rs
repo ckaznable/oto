@@ -7,10 +7,14 @@ use ratatui::{buffer::Buffer, layout::Rect, widgets::{ListItem, Row, ScrollbarSt
 use rustc_hash::FxBuildHasher;
 use strum::{Display, FromRepr};
 
+use ratatui::text::{Line, Span};
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
+use tui_input::Input;
+
+use crate::{event::CursorMove, media::TracksTree, tui::image::UnCachedProtocol};
+
 type FxIndexSet<T> = IndexSet<T, FxBuildHasher>;
 pub type PickedPlaylistRef = Rc<RefCell<FxIndexSet<usize>>>;
-
-use ratatui::text::{Line, Span};
 
 #[derive(Clone, Copy, Default, FromRepr)]
 #[repr(u8)]
@@ -95,10 +99,6 @@ pub struct PreRenderState {
     pub keybinding_lines: Vec<Line<'static>>,
     pub devices_lines: Vec<(ListItem<'static>, i32, i32)>,
 }
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
-use tui_input::Input;
-
-use crate::{event::CursorMove, media::TracksTree, tui::image::UnCachedProtocol};
 
 pub trait CursorMovable {
     fn cursor_index(&self) -> usize;
