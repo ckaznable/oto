@@ -64,11 +64,13 @@ impl AudioOutput {
     }
 
     pub fn pcm_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
+        self.inner.hw_free()?;
+
         let hwp = HwParams::any(&self.inner)?;
+        hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
+        hwp.set_format(alsa::pcm::Format::S32LE)?;
         hwp.set_channels(channel)?;
         hwp.set_rate(sample_rate, alsa::ValueOr::Nearest)?;
-        hwp.set_format(alsa::pcm::Format::S32LE)?;
-        hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
         self.inner.hw_params(&hwp)?;
         Ok(())
     }
