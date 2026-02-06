@@ -44,7 +44,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 [[package]]
 name = "alsa"
 version = "0.11.0"
-source = "git+https://github.com/ckaznable/alsa-rs.git?rev=f904e4aa5da2c4c0a14782369f18a58e0741fd4a#f904e4aa5da2c4c0a14782369f18a58e0741fd4a"
+source = "git+https://github.com/ckaznable/alsa-rs.git?rev=dbc894049a88764736a0202c0fd5e3aa90dda1ee#dbc894049a88764736a0202c0fd5e3aa90dda1ee"
 dependencies = [
  "alsa-sys",
  "bitflags 2.10.0",

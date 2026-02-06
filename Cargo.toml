@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-alsa = { git = "https://github.com/ckaznable/alsa-rs.git", rev = "f904e4aa5da2c4c0a14782369f18a58e0741fd4a" }
+alsa = { git = "https://github.com/ckaznable/alsa-rs.git", rev = "dbc894049a88764736a0202c0fd5e3aa90dda1ee" }
 anyhow = "1"
 bytemuck = "1.24.0"
 clap = { version = "4.5", features = ["derive"] }
