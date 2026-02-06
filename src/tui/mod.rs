@@ -227,6 +227,12 @@ fn app(
                         .send(MatcherCommand::PlaylistUpdate(list.clone()))
                         .ok();
                 }
+
+                if playlist.picked.as_deref().map_or(0, |p| p.len())
+                    != list.picked.as_deref().map_or(0, |p| p.len())
+                {
+                    ui_state.queue.move_to_start();
+                }
                 drop(ui_state);
                 drop(playlist);
 
