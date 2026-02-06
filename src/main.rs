@@ -59,8 +59,9 @@ fn main() -> Result<()> {
                 LevelFilter::Debug,
                 simplelog::Config::default(),
                 simplelog::TerminalMode::Mixed,
-                simplelog::ColorChoice::Auto
-            ).unwrap();
+                simplelog::ColorChoice::Auto,
+            )
+            .unwrap();
 
             if let Err(e) = oto::dict::download_and_build_dictionary(true) {
                 log::error!("{e}");
@@ -77,6 +78,10 @@ fn main() -> Result<()> {
             )
         }
         cli::Commands::Tui { path, device } => {
+            unsafe {
+                std::env::set_var("MALLOC_MMAP_THRESHOLD_", (1024 * 1024 * 2).to_string());
+            }
+
             WriteLogger::init(
                 if cfg!(debug_assertions) {
                     LevelFilter::Debug
@@ -91,12 +96,14 @@ fn main() -> Result<()> {
             let _guard = redirect_stderr_to_log();
 
             use enclose::enclose;
-            std::thread::spawn(enclose!((app_tx) move || {
-                if let Err(e) = player_event_loop(PlayerEventLoopConfig::without_play(path, device), app_tx.clone(), mpris_tx, player_rx) {
-                    app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
-                    log::error!("{e:?}");
-                }
-            }));
+            std::thread::Builder::new()
+                .name("player-event-loop".into())
+                .spawn(enclose!((app_tx) move || {
+                    if let Err(e) = player_event_loop(PlayerEventLoopConfig::without_play(path, device), app_tx.clone(), mpris_tx, player_rx) {
+                        app_tx.send(AppCommand::Unexcepted(e.to_string())).ok();
+                        log::error!("{e:?}");
+                    }
+                }))?;
 
             oto::tui::tui(player_tx, app_tx, app_rx)
         }
@@ -116,22 +123,25 @@ fn redirect_stderr_to_log() -> Redirect<PipeWriter> {
 
     let redirect = Redirect::stderr(writer).unwrap();
 
-    std::thread::spawn(move || {
-        let mut buf_reader = BufReader::new(reader);
-        let mut line = String::new();
+    std::thread::Builder::new()
+        .name("redirect-stderr".into())
+        .spawn(move || {
+            let mut buf_reader = BufReader::new(reader);
+            let mut line = String::new();
 
-        while let Ok(len) = buf_reader.read_line(&mut line) {
-            if len == 0 {
-                break;
-            }
+            while let Ok(len) = buf_reader.read_line(&mut line) {
+                if len == 0 {
+                    break;
+                }
 
-            let clean_line = line.trim();
-            if !clean_line.is_empty() {
-                log::error!(target: "stderr", "{}", clean_line);
+                let clean_line = line.trim();
+                if !clean_line.is_empty() {
+                    log::error!(target: "stderr", "{}", clean_line);
+                }
+                line.clear();
             }
-            line.clear();
-        }
-    });
+        })
+        .expect("create thread redirect thread failed");
 
     redirect
 }

@@ -131,12 +131,14 @@ pub fn tui(
     let state = AppState::new();
 
     let key_handle_mode = state.key_handle_mode.clone();
-    std::thread::spawn(
-        enclose!((tx, player_tx) move || handle_keypress(tx, player_tx, key_handle_mode)),
-    );
+    std::thread::Builder::new()
+        .name("handle-crossterm-event".into())
+        .spawn(enclose!((tx, player_tx) move || handle_keypress(tx, player_tx, key_handle_mode)))?;
 
     let (matcher_tx, matcher_rx) = channel();
-    std::thread::spawn(enclose!((tx, matcher_tx) move || matcher(matcher_tx, tx, matcher_rx)));
+    std::thread::Builder::new()
+        .name("fuzzy-mathcer".into())
+        .spawn(enclose!((tx, matcher_tx) move || matcher(matcher_tx, tx, matcher_rx)))?;
 
     ratatui::run(move |t| app(t, tx, rx, player_tx, matcher_tx, picker, state))?;
     Ok(())
@@ -387,10 +389,6 @@ fn app(
                             .map(|p| p.update_resized_protocol(stateful_protocol));
                     }
                 }
-
-                unsafe {
-                    libc::malloc_trim(0);
-                }
             }
             AppCommand::DevicesList(devices) => {
                 log::info!("devices: {devices:?}");
@@ -400,7 +398,10 @@ fn app(
 
                 let devices_state = state.devices.borrow();
                 let theme = &state.theme;
-                let lines = crate::tui::collapsible::devices_list::build_devices_lines(&devices_state, theme);
+                let lines = crate::tui::collapsible::devices_list::build_devices_lines(
+                    &devices_state,
+                    theme,
+                );
                 drop(devices_state);
 
                 state.pre_render.borrow_mut().devices_lines = lines;

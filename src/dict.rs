@@ -6,7 +6,6 @@ use lindera::{
     segmenter::Segmenter,
     tokenizer::Tokenizer,
 };
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     io::{Cursor, Read},
     sync::{Arc, mpsc::Sender},
@@ -42,21 +41,34 @@ pub fn kanji_to_romaji(tx: Sender<MatcherCommand>, playlist: &[TrackMeta]) {
     let tokenizer = Arc::new(Tokenizer::new(segmenter));
     log::debug!("japanese tokenizer ready");
 
-    let processed_data: Vec<Option<String>> = playlist
-        .par_iter()
-        .map(|track| {
+    let n = playlist.len();
+    let mut processed_data = vec![None; n];
+
+    let num_threads = 4;
+    let chunk_size = (n + num_threads - 1).max(1) / num_threads;
+    let chunk_size = chunk_size.max(1);
+
+    std::thread::scope(|s| {
+        let playlist_chunks = playlist.chunks(chunk_size);
+        let data_chunks = processed_data.chunks_mut(chunk_size);
+
+        for (chunk, result_slice) in playlist_chunks.zip(data_chunks) {
             let tokenizer = Arc::clone(&tokenizer);
 
-            let text = format!(
-                "{}-{}-{}",
-                track.title.as_deref().unwrap_or(""),
-                track.artist.as_deref().unwrap_or(""),
-                track.album.name.as_deref().unwrap_or(""),
-            );
+            s.spawn(move || {
+                for (item, result_slot) in chunk.iter().zip(result_slice) {
+                    let text = format!(
+                        "{}-{}-{}",
+                        item.title.as_deref().unwrap_or(""),
+                        item.artist.as_deref().unwrap_or(""),
+                        item.album.name.as_deref().unwrap_or(""),
+                    );
 
-            convert_to_romaji(&text, &tokenizer)
-        })
-        .collect();
+                    *result_slot = convert_to_romaji(&text, &tokenizer);
+                }
+            });
+        }
+    });
 
     tx.send(MatcherCommand::KanjiToRomaji(processed_data)).ok();
 }

@@ -35,7 +35,6 @@ thiserror = "2.0.17"
 walkdir = "2.5.0"
 strum = { version = "0.27", features = ["derive"] }
 lofty = "0.22.4"
-rayon = "1.11.0"
 souvlaki = { version = "0.8.3", default-features = false, features = ["use_zbus"] }
 tempfile = "3.24.0"
 gag = "1.0.0"
@@ -50,7 +49,7 @@ itertools = "0.14.0"
 tui-input = "0.15.0"
 nucleo-matcher = "0.3.1"
 libc = "0.2"
-lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", optional = true }
+lindera = { git = "https://github.com/ckaznable/lindera.git", rev = "123e69b5f4235c7c07748e3b3180aa7e1245e56c", default-features = false, optional = true }
 wana_kana = { version = "4.0.0", optional = true }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1.1.9", optional = true }
@@ -77,4 +76,4 @@ dict-jp = [
   "dep:md5",
   "dep:serde_json",
 ]
-dict-jp-embed = ["dict-jp", "lindera/embed-ipadic"]
+dict-jp-embed = ["dict-jp", "lindera/embed-ipadic", "lindera/compress"]

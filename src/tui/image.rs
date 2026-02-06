@@ -1,21 +1,21 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use ratatui::{prelude::*, widgets::Block};
 use std::{
     io::Cursor,
     ops::{Deref, DerefMut},
     path::PathBuf,
     sync::{
-        mpsc::{channel, Receiver, Sender},
         Arc,
+        mpsc::{Receiver, Sender, channel},
     },
     thread::JoinHandle,
 };
 
 use mini_moka::sync::Cache;
 use ratatui_image::{
+    Resize, ResizeEncodeRender,
     picker::Picker,
     protocol::{Protocol, StatefulProtocol},
-    Resize, ResizeEncodeRender,
 };
 
 use crate::util::cover_from_path;
@@ -147,20 +147,28 @@ where
 
         let rx = self.rx.take().unwrap();
         let on_cached = self.on_cached.take();
-        let handle = std::thread::spawn(move || loop {
-            match rx.recv() {
-                Err(_) => break Ok(()),
-                Ok(req) => {
-                    let result = req.encode(&picker);
-                    if let Some(ref f) = on_cached {
-                        match result {
-                            Ok(result) => f(result),
-                            Err(e) => log::error!("{e:?}"),
+        let handle = std::thread::Builder::new()
+            .name("image decoder".into())
+            .spawn(move || {
+                loop {
+                    match rx.recv() {
+                        Err(_) => break Ok(()),
+                        Ok(req) => {
+                            let result = req.encode(&picker);
+                            if let Some(ref f) = on_cached {
+                                match result {
+                                    Ok(result) => f(result),
+                                    Err(e) => log::error!("{e:?}"),
+                                }
+                            }
+
+                            unsafe {
+                                libc::malloc_trim(0);
+                            }
                         }
                     }
                 }
-            }
-        });
+            })?;
 
         self.handle = Some(handle);
         Ok(())

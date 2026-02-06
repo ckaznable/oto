@@ -46,48 +46,50 @@ impl Mpris {
 
         std::fs::create_dir_all(PROJ_DIRS.cache_dir())?;
 
-        std::thread::spawn(move || {
-            loop {
-                if let Ok(event) = rx.recv() {
-                    match event {
-                        MprisCommand::TrackUpdate(track, _) => {
-                            let cover_url = track.cover().and_then(|data| {
-                                let cover_file_path =
-                                    PROJ_DIRS.cache_dir().join(COVER_CACHE_FILE_NAME);
-                                let mut f = std::fs::File::create(&cover_file_path).ok()?;
-                                f.write_all(&data).ok();
-                                Some(cover_file_path)
-                            });
+        std::thread::Builder::new()
+            .name("mpris".into())
+            .spawn(move || {
+                loop {
+                    if let Ok(event) = rx.recv() {
+                        match event {
+                            MprisCommand::TrackUpdate(track, _) => {
+                                let cover_url = track.cover().and_then(|data| {
+                                    let cover_file_path =
+                                        PROJ_DIRS.cache_dir().join(COVER_CACHE_FILE_NAME);
+                                    let mut f = std::fs::File::create(&cover_file_path).ok()?;
+                                    f.write_all(&data).ok();
+                                    Some(cover_file_path)
+                                });
 
-                            controls
-                                .set_metadata(MediaMetadata {
-                                    title: track.title.as_deref(),
-                                    artist: track.artist.as_deref(),
-                                    album: track.album.name.as_deref(),
-                                    duration: Some(Duration::from_secs(track.duration_secs)),
-                                    cover_url: cover_url
-                                        .as_ref()
-                                        .and_then(|p| p.as_os_str().to_str()),
-                                })
-                                .ok();
-                        }
-                        MprisCommand::PlayBackStateUpdate(c, p) => {
-                            let progress = Some(MediaPosition(Duration::from_secs_f64(c)));
-                            controls
-                                .set_playback(if p {
-                                    MediaPlayback::Playing { progress }
-                                } else {
-                                    MediaPlayback::Paused { progress }
-                                })
-                                .ok();
-                        }
-                        MprisCommand::VolumeUpdate(v) => {
-                            controls.set_volume(v as f64 / 100.).ok();
+                                controls
+                                    .set_metadata(MediaMetadata {
+                                        title: track.title.as_deref(),
+                                        artist: track.artist.as_deref(),
+                                        album: track.album.name.as_deref(),
+                                        duration: Some(Duration::from_secs(track.duration_secs)),
+                                        cover_url: cover_url
+                                            .as_ref()
+                                            .and_then(|p| p.as_os_str().to_str()),
+                                    })
+                                    .ok();
+                            }
+                            MprisCommand::PlayBackStateUpdate(c, p) => {
+                                let progress = Some(MediaPosition(Duration::from_secs_f64(c)));
+                                controls
+                                    .set_playback(if p {
+                                        MediaPlayback::Playing { progress }
+                                    } else {
+                                        MediaPlayback::Paused { progress }
+                                    })
+                                    .ok();
+                            }
+                            MprisCommand::VolumeUpdate(v) => {
+                                controls.set_volume(v as f64 / 100.).ok();
+                            }
                         }
                     }
                 }
-            }
-        });
+            })?;
 
         Ok(Self {})
     }

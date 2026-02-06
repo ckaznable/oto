@@ -6,7 +6,6 @@ use lofty::{
     probe::Probe,
     tag::Accessor,
 };
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::{
     fs::File,
     io::{Read, Write},
@@ -201,14 +200,27 @@ impl MediaStore {
 
         log::info!("found media files: {}", files.len());
 
-        let tracks: Vec<TrackMeta> = files
-            .par_iter()
-            .map(|entry| {
-                let path = entry.path();
-                Self::parse_one_file(path)
-            })
-            .flatten()
-            .collect();
+        let n = files.len();
+        let mut temp_results = vec![None; n];
+
+        let num_threads = 4;
+        let chunk_size = (n + num_threads - 1).max(1) / num_threads;
+
+        std::thread::scope(|s| {
+            let file_chunks = files.chunks(chunk_size);
+            let result_chunks = temp_results.chunks_mut(chunk_size);
+
+            for (file_chunk, result_slice) in file_chunks.zip(result_chunks) {
+                s.spawn(move || {
+                    for (entry, result_slot) in file_chunk.iter().zip(result_slice) {
+                        let path = entry.path();
+                        *result_slot = Self::parse_one_file(path);
+                    }
+                });
+            }
+        });
+
+        let tracks: Vec<TrackMeta> = temp_results.into_iter().flatten().collect();
 
         log::info!("found tracks: {}", tracks.len());
 
