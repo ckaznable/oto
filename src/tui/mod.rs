@@ -55,6 +55,8 @@ use crate::{
 };
 
 pub mod collapsible;
+pub mod clear;
+pub mod gradient;
 pub mod image;
 pub mod media_info;
 pub mod scrollbar;
@@ -385,11 +387,11 @@ fn app(
             AppCommand::ImageEncodeResult(result) => {
                 force_render = true;
                 match result {
-                    image::ProtocolLruResult::Cached(_) => todo!(),
-                    image::ProtocolLruResult::UnCached(_, stateful_protocol) => {
-                        let _ = state
-                            .ui_state
-                            .borrow_mut()
+                    image::ProtocolLruResult::Cached(_, _) => todo!(),
+                    image::ProtocolLruResult::UnCached(_, stateful_protocol, theme_color) => {
+                        let mut ui_state = state.ui_state.borrow_mut();
+                        ui_state.theme_color = theme_color;
+                        let _ = ui_state
                             .cover
                             .as_mut()
                             .map(|p| p.update_resized_protocol(stateful_protocol));

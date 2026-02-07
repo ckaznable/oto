@@ -4,9 +4,7 @@ use anyhow::Result;
 use image::ImageReader;
 use indexmap::IndexSet;
 use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    widgets::{ListItem, Row, ScrollbarState, Widget},
+    buffer::Buffer, layout::Rect, style::Color, widgets::{ListItem, Row, ScrollbarState, Widget}
 };
 use rustc_hash::FxBuildHasher;
 use strum::{Display, FromRepr};
@@ -553,6 +551,7 @@ pub struct UiState {
     pub search: SearchState,
     pub expand_index: usize,
     pub picked_playlist: PickedPlaylistRef,
+    pub theme_color: Option<Color>,
 }
 
 impl Default for UiState {
@@ -567,6 +566,7 @@ impl Default for UiState {
             search: SearchState::new(Rc::clone(&picked_playlist)),
             expand_index: 0,
             picked_playlist,
+            theme_color: None,
         }
     }
 }

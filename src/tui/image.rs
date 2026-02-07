@@ -1,4 +1,6 @@
 use anyhow::{Result, anyhow};
+use image::{DynamicImage, GenericImageView};
+use palette::{FromColor, Hsl, Srgb};
 use ratatui::{prelude::*, widgets::Block};
 use std::{
     io::Cursor,
@@ -95,6 +97,7 @@ impl ProtocolLruData {
                 area,
                 path,
             } => {
+                let mut tiny_img = None;
                 let Some(mut protocol) = protocol.or_else(|| {
                     log::info!("encode {path:?} to terminal protocol");
 
@@ -108,6 +111,8 @@ impl ProtocolLruData {
                         .ok()?
                         .resize(450, 450, image::imageops::FilterType::CatmullRom);
 
+                    tiny_img = Some(dyn_img.thumbnail(10, 10));
+
                     Some(picker.new_resize_protocol(dyn_img))
                 }) else {
                     return Err(anyhow!("get resize protocol failed"));
@@ -117,15 +122,67 @@ impl ProtocolLruData {
                 protocol.resize_encode(&resize, area);
 
                 log::debug!("resize encode done");
-                Ok(ProtocolLruResult::UnCached(image, protocol))
+                Ok(ProtocolLruResult::UnCached(
+                    image,
+                    protocol,
+                    tiny_img.and_then(Self::get_theme_color),
+                ))
             }
         }
+    }
+
+    fn get_theme_color(img: DynamicImage) -> Option<Color> {
+        let mut r_total = 0u32;
+        let mut g_total = 0u32;
+        let mut b_total = 0u32;
+        let mut count = 0u32;
+
+        for (_, _, pixel) in img.pixels() {
+            let r = pixel[0];
+            let g = pixel[1];
+            let b = pixel[2];
+
+            let brightness = (r as u32 + g as u32 + b as u32) / 3;
+            if brightness > 30 && brightness < 220 {
+                r_total += r as u32;
+                g_total += g as u32;
+                b_total += b as u32;
+                count += 1;
+            }
+        }
+
+        if count == 0 {
+            return Some(ratatui::style::Color::Rgb(40, 40, 40));
+        }
+
+        let avg_r = (r_total / count) as u8;
+        let avg_g = (g_total / count) as u8;
+        let avg_b = (b_total / count) as u8;
+
+        let rgb = Srgb::new(
+            avg_r as f32 / 255.0,
+            avg_g as f32 / 255.0,
+            avg_b as f32 / 255.0,
+        );
+
+        let mut hsl = Hsl::from_color(rgb);
+
+        hsl.lightness = 0.12;
+        hsl.saturation = (hsl.saturation * 1.2).min(1.0);
+
+        let final_rgb = Srgb::from_color(hsl).into_format::<u8>();
+
+        Some(ratatui::style::Color::Rgb(
+            final_rgb.red,
+            final_rgb.green,
+            final_rgb.blue,
+        ))
     }
 }
 
 pub enum ProtocolLruResult {
-    Cached(String),
-    UnCached(UnCachedImage, StatefulProtocol),
+    Cached(String, Option<Color>),
+    UnCached(UnCachedImage, StatefulProtocol, Option<Color>),
 }
 
 pub struct LruProtocolFactory<F> {
