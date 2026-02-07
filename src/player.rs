@@ -56,6 +56,7 @@ impl AudioOutput {
     }
 
     pub fn set_hw_param(&self, spec: MediaSpec) -> Result<()> {
+        self.inner.hw_free()?;
         use OutputMode::*;
         match spec.mode {
             PCM => self.pcm_hw_param(spec.channels, spec.sample_rate),
@@ -64,8 +65,6 @@ impl AudioOutput {
     }
 
     pub fn pcm_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
-        self.inner.hw_free()?;
-
         let hwp = HwParams::any(&self.inner)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
         hwp.set_format(alsa::pcm::Format::S32LE)?;
