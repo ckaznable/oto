@@ -174,30 +174,22 @@ impl CollapsibleWidget<AppState> for QueueList {
 
     fn render_collapse(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
         let theme = &state.theme;
-        let playlist = state.playlist.borrow();
-        let playing_index = state.ui_state.borrow().queue.playing_index;
-        let playing = playlist
-            .list
-            .iter()
-            .enumerate()
-            .find(|(i, _)| playing_index == *i);
+        let track = &state.playing_track.borrow().track;
 
-        if let Some((_, track)) = playing {
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    track.title.as_deref().unwrap_or_default(),
-                    Style::default().fg(theme.media_title),
-                ),
-                Span::raw(" - "),
-                Span::styled(
-                    track.artist.as_deref().unwrap_or_default(),
-                    Style::default().fg(theme.media_artist),
-                ),
-            ])
-            .style(Style::default().bg(theme.collapse_queue_bg))
-            .render(area, buf);
-        }
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                track.title.as_deref().unwrap_or_default(),
+                Style::default().fg(theme.media_title),
+            ),
+            Span::raw(" - "),
+            Span::styled(
+                track.artist.as_deref().unwrap_or_default(),
+                Style::default().fg(theme.media_artist),
+            ),
+        ])
+        .style(Style::default().bg(theme.collapse_queue_bg))
+        .render(area, buf);
     }
 }
 
