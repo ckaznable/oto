@@ -15,6 +15,8 @@ OTO is designed for audiophiles who prefer direct hardware access (ALSA) for bit
 
 If you need a more general-purpose MPD client or a feature-rich player, consider using [rmpc](https://github.com/mierak/rmpc).
 
+> **Note**: Due to personal interest in minimizing allocations during TUI rendering, the rendering code prioritizes performance over readability.
+
 ## Features
 
 - **High-Resolution Audio**: Native DSD (DSF) playback and Hi-Res PCM support
