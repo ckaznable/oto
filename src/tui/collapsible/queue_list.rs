@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Cell, Row, Table, Widget},
 };
 
-use crate::tui::{collapsible::CollapsibleWidget, scrollbar, AppState, LAYOUT_WIDTH_S};
+use crate::tui::{AppState, LAYOUT_WIDTH_S, collapsible::CollapsibleWidget, scrollbar};
 
 pub struct QueueList;
 

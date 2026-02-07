@@ -9,10 +9,10 @@ use crate::{
     arena_alloc,
     media::TracksTree,
     tui::{
+        AppState,
         collapsible::{CollapsibleWidget, CollapsibleWidgetGroup},
         scrollbar,
         state::TracksMode,
-        AppState,
     },
 };
 
@@ -364,7 +364,10 @@ fn render_list_with_scrollbar(
             Style::default().fg(text_color)
         };
 
-        text.spans.insert(0, Span::styled(format!("{indicator} {prefix}"), prefix_style));
+        text.spans.insert(
+            0,
+            Span::styled(format!("{indicator} {prefix}"), prefix_style),
+        );
         let line = Line::from(text.spans);
 
         let item = ListItem::new(line).style(Style::default().bg(bg_color));

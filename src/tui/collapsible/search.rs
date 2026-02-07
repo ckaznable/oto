@@ -7,7 +7,7 @@ use ratatui::{
 
 use crate::{
     arena_alloc,
-    tui::{collapsible::CollapsibleWidget, scrollbar, AppState, KeyHandleMode},
+    tui::{AppState, KeyHandleMode, collapsible::CollapsibleWidget, scrollbar},
 };
 
 pub struct Search;

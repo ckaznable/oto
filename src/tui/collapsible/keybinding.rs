@@ -1,8 +1,8 @@
 use ratatui::{prelude::*, text::Span, widgets::Widget};
 
 use crate::tui::{
-    collapsible::{CollapseWidgets, CollapsibleWidget},
     AppState,
+    collapsible::{CollapseWidgets, CollapsibleWidget},
 };
 
 pub struct KeyBinding;

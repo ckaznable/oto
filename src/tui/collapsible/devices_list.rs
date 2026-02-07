@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{List, ListItem, Widget},
 };
 
-use crate::tui::{collapsible::CollapsibleWidget, scrollbar, AppState};
+use crate::tui::{AppState, collapsible::CollapsibleWidget, scrollbar};
 
 pub struct DevicesList;
 

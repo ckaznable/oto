@@ -54,8 +54,8 @@ use crate::{
     },
 };
 
-pub mod collapsible;
 pub mod clear;
+pub mod collapsible;
 pub mod gradient;
 pub mod image;
 pub mod media_info;

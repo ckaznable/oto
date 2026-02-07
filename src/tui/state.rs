@@ -4,7 +4,10 @@ use anyhow::Result;
 use image::ImageReader;
 use indexmap::IndexSet;
 use ratatui::{
-    buffer::Buffer, layout::Rect, style::Color, widgets::{ListItem, Row, ScrollbarState, Widget}
+    buffer::Buffer,
+    layout::Rect,
+    style::Color,
+    widgets::{ListItem, Row, ScrollbarState, Widget},
 };
 use rustc_hash::FxBuildHasher;
 use strum::{Display, FromRepr};
