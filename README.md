@@ -6,6 +6,8 @@ A picky, unstable, yet simple music player.
 [![Built With Ratatui](https://img.shields.io/badge/Built_With_Ratatui-000?logo=ratatui&logoColor=fff)](https://ratatui.rs/)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
+![](./assets/demo.png)
+
 OTO is designed for audiophiles who prefer direct hardware access (ALSA) for bit-perfect playback. This means:
 
 1. **Exclusive Access**: It requires exclusive control of the audio device. Other applications may not be able to play sound while OTO is running.
