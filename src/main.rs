@@ -400,7 +400,10 @@ fn player_event_loop(
         }
 
         if !matches!(output.state(), State::Running | State::Paused) {
-            output.start()?;
+            if let Err(e) = output.start() {
+                tx.send(AppCommand::Unexcepted(e.to_string())).ok();
+            }
+
             if !init && !init_play {
                 output.pause(true)?;
                 mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
