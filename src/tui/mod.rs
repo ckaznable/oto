@@ -64,7 +64,7 @@ pub mod state;
 pub mod state_bar;
 pub mod theme;
 
-pub const LAYOUT_WIDTH_S: u16 = 65;
+pub const LAYOUT_WIDTH_S: u16 = 70;
 pub const LAYOUT_WIDTH_L: u16 = 120;
 
 #[derive(Clone)]
