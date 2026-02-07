@@ -390,11 +390,14 @@ fn app(
                     image::ProtocolLruResult::Cached(_, _) => todo!(),
                     image::ProtocolLruResult::UnCached(_, stateful_protocol, theme_color) => {
                         let mut ui_state = state.ui_state.borrow_mut();
-                        ui_state.theme_color = theme_color;
                         let _ = ui_state
                             .cover
                             .as_mut()
                             .map(|p| p.update_resized_protocol(stateful_protocol));
+
+                        if theme_color.is_some() {
+                            ui_state.theme_color = theme_color;
+                        }
                     }
                 }
             }
