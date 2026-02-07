@@ -342,6 +342,9 @@ fn player_event_loop(
                         output.prepare().ok();
 
                         let spec = player.spec.unwrap_or_default();
+                        output.init(spec).ok();
+
+                        let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
                     }
@@ -402,6 +405,8 @@ fn player_event_loop(
         if !matches!(output.state(), State::Running | State::Paused) {
             if let Err(e) = output.start() {
                 tx.send(AppCommand::Unexcepted(e.to_string())).ok();
+                log::error!("{e}");
+                break;
             }
 
             if !init && !init_play {
