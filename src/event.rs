@@ -60,6 +60,7 @@ pub enum AppCommand {
     TogglePickerMode,
     EditEvent(Event),
     UpdateFiltered(String, Vec<usize>),
+    RandomPlaylist,
 }
 
 #[derive(Clone)]

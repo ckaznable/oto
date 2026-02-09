@@ -14,6 +14,7 @@ use nucleo_matcher::{
     Matcher,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
+use rand::seq::SliceRandom;
 use ratatui_image::picker::Picker;
 use std::{
     cell::{Cell, RefCell},
@@ -163,6 +164,8 @@ fn app(
 
     let min_refresh_duration = Duration::from_secs_f64(1. / 30.);
     let mut timer = Instant::now();
+
+    let mut rng = rand::rng();
 
     // first draw
     terminal.draw(enclose!((state) move |f| render(f, state)))?;
@@ -456,6 +459,50 @@ fn app(
                 {
                     ui_state.search.filtered_indices = indices;
                     force_render = true;
+                }
+            }
+            AppCommand::RandomPlaylist => {
+                if matches!(
+                    CollapseWidgets::get(state.ui_state.borrow().expand_index),
+                    CollapseWidgets::QueueList
+                ) {
+                    let playlist = state.playlist.borrow();
+                    let (mut picked, index): (Vec<usize>, usize) = if playlist.picked.is_none() {
+                        let list = (0..playlist.list.len())
+                            .filter(|i| *i != playlist.index)
+                            .collect();
+                        (list, playlist.index)
+                    } else {
+                        let index = playlist
+                            .picked
+                            .as_deref()
+                            .and_then(|i| i.get(playlist.index))
+                            .copied()
+                            .unwrap();
+
+                        let list = playlist
+                            .picked
+                            .as_deref()
+                            .map(|p| {
+                                p.iter()
+                                    .filter(|i| **i != index)
+                                    .copied()
+                                    .collect::<Vec<usize>>()
+                            })
+                            .unwrap_or_default();
+
+                        (list, index)
+                    };
+
+                    picked.shuffle(&mut rng);
+                    picked.insert(0, index);
+
+                    state.ui_state.borrow_mut().queue.move_to_start();
+                    player_tx
+                        .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Picked(
+                            picked,
+                        )))
+                        .ok();
                 }
             }
         }

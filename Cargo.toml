@@ -57,6 +57,7 @@ md5 = { version = "0.8.0", optional = true }
 serde_json = { version = "1", optional = true }
 ureq = { version = "3", default-features = false, features = ["native-tls"], optional = true }
 palette = "0.7.6"
+rand = "0.10.0"
 
 [profile.release]
 opt-level = 3

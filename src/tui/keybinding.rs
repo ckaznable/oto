@@ -185,6 +185,12 @@ fn handle_app_keypress(
             mode.store(KeyHandleMode::Edit as u8, atomic::Ordering::Relaxed);
             tx.send(AppCommand::Rerender(true)).ok();
         }
+        KeyEvent {
+            code: KeyCode::Char('r'),
+            ..
+        } => {
+            tx.send(AppCommand::RandomPlaylist).ok();
+        }
         _ => {}
     }
 }

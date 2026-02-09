@@ -243,12 +243,11 @@ impl BufferPlayer {
     }
 
     pub fn reload(&mut self) -> Result<Option<TrackMeta>> {
-        if let Some(track) = self.current() {
-            if let Some(ref path) = self.decoder.file_path
-                && path != &track.path
-            {
-                self.open(&track.path)?;
-            }
+        if let Some(track) = self.current()
+            && let Some(ref path) = self.decoder.file_path
+            && path != &track.path
+        {
+            self.open(&track.path)?;
             return Ok(Some(track));
         }
 
