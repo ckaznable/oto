@@ -533,10 +533,6 @@ impl SearchState {
         self.cursor_index
     }
 
-    pub fn request(&self) {
-        todo!()
-    }
-
     pub fn update(&mut self, indices: Vec<usize>) {
         self.filtered_indices = indices;
         self.cursor_index = 0;
