@@ -75,7 +75,6 @@ pub struct CacheState {
     pub rows: Vec<Row<'static>>,
     pub list_items: Vec<ListItem<'static>>,
     pub tracks_items: Vec<(Line<'static>, bool)>,
-    pub spans: Vec<Span<'static>>,
     pub line: Line<'static>,
 }
 
