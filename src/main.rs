@@ -347,9 +347,12 @@ fn player_event_loop(
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
+                        current_time = 0.;
                     }
 
                     tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
+                        .ok();
+                    mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
                         .ok();
                 }
             }
