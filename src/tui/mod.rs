@@ -251,7 +251,16 @@ fn app(
                 let mut ui_state = state.ui_state.borrow_mut();
 
                 let len = match CollapseWidgets::get(index) {
-                    CollapseWidgets::QueueList => Some(state.playlist.borrow().list.len()),
+                    CollapseWidgets::QueueList => {
+                        let playlist = state.playlist.borrow();
+                        Some(
+                            playlist
+                                .picked
+                                .as_deref()
+                                .map(|p| p.len())
+                                .unwrap_or(playlist.list.len()),
+                        )
+                    }
                     CollapseWidgets::TrackPicker => ui_state.tracks.len(),
                     CollapseWidgets::DevicesList => Some(state.devices.borrow().len()),
                     CollapseWidgets::Search => Some(ui_state.search.filtered_indices.len()),
