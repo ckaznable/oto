@@ -44,13 +44,13 @@ fn handle_app_keypress(
             code: KeyCode::Char('J'),
             ..
         } => {
-            player_tx.send(PlayerCommand::SetRelatedVolume(-5)).ok();
+            player_tx.send(PlayerCommand::SetRelatedVolume(-3)).ok();
         }
         KeyEvent {
             code: KeyCode::Char('K'),
             ..
         } => {
-            player_tx.send(PlayerCommand::SetRelatedVolume(5)).ok();
+            player_tx.send(PlayerCommand::SetRelatedVolume(3)).ok();
         }
         KeyEvent {
             code: KeyCode::Char('j'),
