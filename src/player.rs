@@ -1,4 +1,9 @@
-use std::{collections::VecDeque, ops::Deref, path::PathBuf, sync::Arc};
+use std::{
+    collections::VecDeque,
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use anyhow::{Result, anyhow};
 
@@ -22,13 +27,15 @@ use crate::{
 
 pub struct AudioOutput {
     inner: PCM,
+    device_name: String,
 }
 
 impl AudioOutput {
     pub fn new(device_name: impl AsRef<str>) -> Result<Self> {
         let inner = PCM::new(device_name.as_ref(), Direction::Playback, false)?;
+        let device_name = device_name.as_ref().to_owned();
 
-        Ok(Self { inner })
+        Ok(Self { inner, device_name })
     }
 
     pub fn replace(&mut self, device_name: impl AsRef<str>) -> Result<()> {
@@ -55,7 +62,7 @@ impl AudioOutput {
         }
     }
 
-    pub fn set_hw_param(&self, spec: MediaSpec) -> Result<()> {
+    fn set_hw_param(&self, spec: MediaSpec) -> Result<()> {
         self.inner.hw_free()?;
         use OutputMode::*;
         match spec.mode {
@@ -64,7 +71,7 @@ impl AudioOutput {
         }
     }
 
-    pub fn pcm_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
+    fn pcm_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.inner)?;
         hwp.set_access(alsa::pcm::Access::RWInterleaved)?;
         hwp.set_format(alsa::pcm::Format::S32LE)?;
@@ -74,7 +81,7 @@ impl AudioOutput {
         Ok(())
     }
 
-    pub fn dsd_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
+    fn dsd_hw_param(&self, channel: u32, sample_rate: u32) -> Result<()> {
         let hwp = HwParams::any(&self.inner)?;
         hwp.set_channels(channel)?;
         hwp.set_format(alsa::pcm::Format::DSDU32BE)?;
@@ -84,7 +91,7 @@ impl AudioOutput {
         Ok(())
     }
 
-    pub fn set_sw_param(&self, spec: MediaSpec) -> Result<()> {
+    fn set_sw_param(&self, spec: MediaSpec) -> Result<()> {
         use OutputMode::*;
         match spec.mode {
             PCM => self.pcm_sw_param(),
@@ -92,7 +99,7 @@ impl AudioOutput {
         }
     }
 
-    pub fn pcm_sw_param(&self) -> Result<()> {
+    fn pcm_sw_param(&self) -> Result<()> {
         let swp = self.inner.sw_params_current()?;
         let hwp = self.inner.hw_params_current()?;
 
@@ -103,7 +110,7 @@ impl AudioOutput {
         Ok(())
     }
 
-    pub fn dsd_sw_param(&self) -> Result<()> {
+    fn dsd_sw_param(&self) -> Result<()> {
         self.pcm_sw_param()
     }
 
@@ -116,9 +123,8 @@ impl AudioOutput {
             log::error!("{e}");
         }
 
-        let status = self.inner.status()?;
         if !matches!(
-            status.get_state(),
+            self.inner.state(),
             State::Running | State::Prepared | State::Paused
         ) {
             self.inner.prepare()?;
@@ -160,6 +166,7 @@ pub enum LastPlayerState {
 pub type PlayerResult = Result<usize, PlayerError>;
 
 pub struct BufferPlayer {
+    inner: AudioOutput,
     rb: LocalRb<Heap<i32>>,
     buf: VecDeque<i32>,
     decoder: MixDecoder,
@@ -171,14 +178,17 @@ pub struct BufferPlayer {
 }
 
 impl BufferPlayer {
-    pub fn new(p: Option<PathBuf>) -> Result<Self> {
+    pub fn new(p: Option<PathBuf>, device: impl AsRef<str>) -> Result<Self> {
         let rb: LocalRb<Heap<i32>> = LocalRb::new(RING_BUF_ALLOC);
         let buf = VecDeque::<i32>::with_capacity(TMP_BUF_ALLOC);
 
         let decoder = MixDecoder::default();
         let playlist = PlayList::new(p);
 
+        let inner = AudioOutput::new(device)?;
+
         Ok(Self {
+            inner,
             rb,
             buf,
             decoder,
@@ -195,7 +205,9 @@ impl BufferPlayer {
             .playlist
             .current()
             .ok_or(anyhow!("music file not found"))?;
-        self.open(track.path.clone())
+        self.open_without_init(&track.clone())?;
+        self.inner.init(self.spec.unwrap_or_default())?;
+        Ok(())
     }
 
     pub fn clear_buffer(&mut self) {
@@ -207,16 +219,41 @@ impl BufferPlayer {
         self.last_state.take()
     }
 
-    pub fn open(&mut self, p: impl Into<PathBuf>) -> Result<()> {
-        self.decoder.open(p.into())?;
+    pub fn open_without_init(&mut self, track: &TrackMeta) -> Result<()> {
+        self.decoder.open(PathBuf::from(&track.path))?;
         self.spec = self.decoder.spec();
         self.written_sample_count = 0;
         Ok(())
     }
 
+    pub fn open(&mut self, track: &TrackMeta) -> Result<()> {
+        let old_spec = self.spec;
+        self.open_without_init(track)?;
+        let new_spec = self.spec;
+
+        if old_spec
+            .zip(new_spec)
+            .map(|(a, b)| a.sample_rate != b.sample_rate)
+            .unwrap_or(false)
+        {
+            log::info!("sapmle rate diffrent reset hwp and swp");
+            self.inner.init(new_spec.unwrap_or_default())?;
+            self.inner.prepare()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn open_immediately(&mut self, track: &TrackMeta) -> Result<()> {
+        self.inner.drop()?;
+        self.open(track)?;
+        self.inner.prepare()?;
+        Ok(())
+    }
+
     pub fn play(&mut self, index: usize) -> Result<Option<TrackMeta>> {
         if let Some(track) = self.playlist.play(index) {
-            self.open(&track.path)?;
+            self.open_immediately(&track)?;
             return Ok(Some(track));
         }
 
@@ -226,7 +263,7 @@ impl BufferPlayer {
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<Option<TrackMeta>> {
         if let Some(track) = self.playlist.next() {
-            self.open(&track.path)?;
+            self.open_immediately(&track)?;
             return Ok(Some(track));
         }
 
@@ -235,7 +272,7 @@ impl BufferPlayer {
 
     pub fn prev(&mut self) -> Result<Option<TrackMeta>> {
         if let Some(track) = self.playlist.prev() {
-            self.open(&track.path)?;
+            self.open_immediately(&track)?;
             return Ok(Some(track));
         }
 
@@ -247,7 +284,7 @@ impl BufferPlayer {
             && let Some(ref path) = self.decoder.file_path
             && path != &track.path
         {
-            self.open(&track.path)?;
+            self.open_immediately(&track)?;
             return Ok(Some(track));
         }
 
@@ -258,7 +295,7 @@ impl BufferPlayer {
         self.playlist.current().cloned()
     }
 
-    pub fn consume(&mut self, output: &mut AudioOutput) -> PlayerResult {
+    pub fn consume(&mut self) -> PlayerResult {
         let mut written = 0usize;
 
         let Some(spec) = self.spec else {
@@ -268,8 +305,8 @@ impl BufferPlayer {
         // consume the last data in ring buffer
         if !self.rb.is_empty() {
             let (right, left) = self.rb.as_slices();
-            let wr = output.write_io(right, spec)?;
-            let wl = output.write_io(left, spec)?;
+            let wr = self.inner.write_io(right, spec)?;
+            let wl = self.inner.write_io(left, spec)?;
             self.rb.skip(wr + wl);
             written += wr + wl;
         }
@@ -296,8 +333,8 @@ impl BufferPlayer {
         match self.decoder.decode(&mut self.buf) {
             Ok(_) => {
                 let (right, left) = self.buf.as_slices();
-                let wr = output.write_io(right, spec)?;
-                let wl = output.write_io(left, spec)?;
+                let wr = self.inner.write_io(right, spec)?;
+                let wl = self.inner.write_io(left, spec)?;
                 self.buf.drain(..(wr + wl));
                 written += wr + wl;
 
@@ -373,6 +410,40 @@ impl BufferPlayer {
             } => Some(frames * channels as u64 / 32),
         }
     }
+
+    pub fn pause(&mut self, pause: bool) -> Result<()> {
+        if matches!(self.inner.state(), State::Suspended) {
+            self.inner.resume()?;
+        }
+
+        self.inner.pause(pause)?;
+        Ok(())
+    }
+
+    pub fn set_device(&mut self, device: impl AsRef<str>) -> Result<()> {
+        if self.inner.replace(device.as_ref()).is_err() {
+            let device = self.inner.device_name.clone();
+            self.inner.replace(&device)?;
+            return Err(anyhow!("set device failed"));
+        }
+
+        self.inner.init(self.spec.unwrap_or_default())?;
+        Ok(())
+    }
+}
+
+impl Deref for BufferPlayer {
+    type Target = AudioOutput;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for BufferPlayer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 #[derive(Clone, Default)]
@@ -396,6 +467,14 @@ impl PlayList {
             p.get(index).cloned().unwrap_or_default()
         } else {
             index
+        }
+    }
+
+    pub fn list_len(&self) -> usize {
+        if let Some(p) = self.picked.as_deref() {
+            p.len()
+        } else {
+            self.list.len()
         }
     }
 
@@ -437,7 +516,7 @@ impl PlayList {
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<TrackMeta> {
         let next = self.index + 1;
-        if next >= self.list.len() {
+        if next >= self.list_len() {
             return None;
         }
 

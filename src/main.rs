@@ -16,7 +16,7 @@ use oto::{
     devices::{get_default_device, list_devices},
     event::{AppCommand, MprisCommand, PickedPlaylist, PlayerCommand},
     mpris,
-    player::{AudioOutput, BufferPlayer, LastPlayerState, PlayerError},
+    player::{BufferPlayer, LastPlayerState, PlayerError},
     volume::VolumeController,
 };
 
@@ -84,11 +84,7 @@ fn main() -> Result<()> {
             }
 
             WriteLogger::init(
-                if cfg!(debug_assertions) {
-                    LevelFilter::Debug
-                } else {
-                    LevelFilter::Info
-                },
+                LevelFilter::Info,
                 simplelog::Config::default(),
                 std::fs::File::create("/tmp/oto.log").unwrap(),
             )
@@ -165,13 +161,10 @@ fn player_event_loop(
         .or_else(|| get_default_device(&devices).map(|(p, d)| format!("hw:{p},{d}")))
         .unwrap_or_else(|| "hw:0,0".to_string());
 
-    let mut player = BufferPlayer::new(path)?;
+    let mut player = BufferPlayer::new(path, &init_device)?;
     player.init()?;
 
     let init_spec = player.spec.unwrap();
-
-    let mut output = AudioOutput::new(&init_device)?;
-    output.init(init_spec)?;
 
     let mut vc = VolumeController::new(&init_device);
     let mut volume = vc.get_volume().unwrap_or(0);
@@ -214,34 +207,22 @@ fn player_event_loop(
         if let Ok(cmd) = rx.try_recv() {
             match cmd {
                 PlayerCommand::Play => {
-                    if matches!(output.state(), State::Suspended) {
-                        output.resume()?;
-                    }
-
-                    output.pause(false)?;
+                    player.pause(false)?;
                     mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
                         .ok();
                     tx.send(AppCommand::AppModeUpdate(oto::tui::state::AppMode::Playing))
                         .ok();
                 }
                 PlayerCommand::Pause => {
-                    if matches!(output.state(), State::Suspended) {
-                        output.resume()?;
-                    }
-
-                    output.pause(true)?;
+                    player.pause(true)?;
                     mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
                         .ok();
                     tx.send(AppCommand::AppModeUpdate(oto::tui::state::AppMode::Paused))
                         .ok();
                 }
                 PlayerCommand::PauseCycle => {
-                    if matches!(output.state(), State::Suspended) {
-                        output.resume()?;
-                    }
-
-                    let pause = !matches!(output.state(), State::Paused);
-                    output.pause(pause)?;
+                    let pause = !matches!(player.state(), State::Paused);
+                    player.pause(pause)?;
 
                     mtx.send(MprisCommand::PlayBackStateUpdate(current_time, !pause))
                         .ok();
@@ -268,12 +249,7 @@ fn player_event_loop(
                 }
                 PlayerCommand::NextSong => {
                     if let Ok(Some(track)) = player.next() {
-                        player.clear_buffer();
-                        output.drop().ok();
-                        output.prepare().ok();
-
                         let spec = player.spec.unwrap_or_default();
-                        output.init(spec).ok();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
                             .ok();
@@ -282,12 +258,7 @@ fn player_event_loop(
                 }
                 PlayerCommand::PrevSong => {
                     if let Ok(Some(track)) = player.prev() {
-                        player.clear_buffer();
-                        output.drop().ok();
-                        output.prepare().ok();
-
                         let spec = player.spec.unwrap_or_default();
-                        output.init(spec).ok();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
                             .ok();
@@ -296,16 +267,13 @@ fn player_event_loop(
                 }
                 PlayerCommand::PlayTrackWithIndex(index) => {
                     if let Ok(Some(track)) = player.play(index) {
-                        player.clear_buffer();
-                        output.drop().ok();
-                        output.prepare().ok();
-
                         let spec = player.spec.unwrap_or_default();
-                        output.init(spec).ok();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         tx.send(AppCommand::PlaylistUpdate(player.playlist.clone()))
                             .ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
+                        mtx.send(MprisCommand::PlayBackStateUpdate(current_time, true))
+                            .ok();
                     }
                 }
                 PlayerCommand::GetDevices => {
@@ -315,12 +283,10 @@ fn player_event_loop(
                     let mut device = format!("hw:{},{}", d.0, d.1);
                     log::info!("try to set {device}");
 
-                    if output.replace(&device).is_err() {
-                        output.replace(&init_device)?;
+                    if player.set_device(&device).is_err() {
                         device = init_device.clone();
                     };
 
-                    output.init(player.spec.unwrap())?;
                     vc.set_device(&device);
                     tx.send(AppCommand::DeviceUpdate(d)).ok();
 
@@ -337,13 +303,6 @@ fn player_event_loop(
                     if let Ok(Some(track)) = player.reload()
                         && is_set_whole_list
                     {
-                        player.clear_buffer();
-                        output.drop().ok();
-                        output.prepare().ok();
-
-                        let spec = player.spec.unwrap_or_default();
-                        output.init(spec).ok();
-
                         let spec = player.spec.unwrap_or_default();
                         tx.send(AppCommand::TrackUpdate(track.clone(), spec)).ok();
                         mtx.send(MprisCommand::TrackUpdate(track, spec)).ok();
@@ -358,20 +317,20 @@ fn player_event_loop(
             }
         }
 
-        if matches!(output.state(), State::Paused) {
+        if matches!(player.state(), State::Paused) {
             std::thread::sleep(std::time::Duration::from_millis(100));
             continue;
         }
 
-        output.wait(Some(32))?;
+        player.wait(Some(32))?;
         if !matches!(
-            output.state(),
+            player.state(),
             State::Running | State::Prepared | State::Paused
         ) {
-            output.prepare()?;
+            player.prepare()?;
         }
 
-        current_time = player.calc_duration(match output.delay() {
+        current_time = player.calc_duration(match player.delay() {
             Ok(d) => d as u64,
             Err(_) => 0,
         });
@@ -381,7 +340,7 @@ fn player_event_loop(
         ))
         .ok();
 
-        if let Err(PlayerError::EOF) = player.consume(&mut output) {
+        if let Err(PlayerError::EOF) = player.consume() {
             break;
         }
 
@@ -405,15 +364,21 @@ fn player_event_loop(
             None => {}
         }
 
-        if !matches!(output.state(), State::Running | State::Paused) {
-            if let Err(e) = output.start() {
-                tx.send(AppCommand::Unexcepted(e.to_string())).ok();
-                log::error!("{e}");
-                break;
+        let state = player.state();
+        if !matches!(state, State::Running | State::Paused) {
+            if let Err(e) = player.start() {
+                let e = e.to_string();
+                // XRUN
+                if e.contains("Broken pipe") {
+                    log::warn!("alsa XRUN");
+                    player.prepare()?;
+                } else {
+                    return Err(anyhow::anyhow!(e));
+                }
             }
 
             if !init && !init_play {
-                output.pause(true)?;
+                player.pause(true)?;
                 mtx.send(MprisCommand::PlayBackStateUpdate(current_time, false))
                     .ok();
                 tx.send(AppCommand::AppModeUpdate(oto::tui::state::AppMode::Normal))
