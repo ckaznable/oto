@@ -61,6 +61,7 @@ pub enum AppCommand {
     EditEvent(Event),
     UpdateFiltered(String, Vec<usize>),
     RandomPlaylist,
+    RemoveFromPicked,
 }
 
 #[derive(Clone)]

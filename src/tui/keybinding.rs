@@ -191,6 +191,12 @@ fn handle_app_keypress(
         } => {
             tx.send(AppCommand::RandomPlaylist).ok();
         }
+        KeyEvent {
+            code: KeyCode::Char('x'),
+            ..
+        } => {
+            tx.send(AppCommand::RemoveFromPicked).ok();
+        }
         _ => {}
     }
 }

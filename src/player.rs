@@ -503,8 +503,12 @@ impl PlayList {
 
     fn init_picked(&mut self) {
         if self.picked.is_none() {
-            self.picked = Arc::new(Some((0..self.list.len()).collect()));
+            self.picked = Arc::new(Some(self.gen_picked()));
         }
+    }
+
+    pub fn gen_picked(&self) -> Vec<usize> {
+        (0..self.list.len()).collect()
     }
 
     pub fn play(&mut self, index: usize) -> Option<TrackMeta> {

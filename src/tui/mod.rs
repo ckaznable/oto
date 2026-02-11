@@ -113,6 +113,10 @@ impl AppState {
         KeyHandleMode::from_repr(self.key_handle_mode.load(atomic::Ordering::Relaxed))
             .unwrap_or(KeyHandleMode::App)
     }
+
+    pub fn expand_widget(&self) -> CollapseWidgets {
+        CollapseWidgets::get(self.ui_state.borrow().expand_index)
+    }
 }
 
 pub fn tui(
@@ -178,6 +182,7 @@ fn app(
 
         let mut force_render = false;
 
+        let expand_widget = state.expand_widget();
         match event {
             AppCommand::Err(e) => log::error!("{e}"),
             AppCommand::Unexcepted(e) => log::error!("{e}"),
@@ -226,17 +231,13 @@ fn app(
 
                 let playlist = state.playlist.borrow();
                 if playlist.list.len() < list.list.len() {
-                    ui_state.search.filtered_indices = (0..list.list.len()).collect();
+                    ui_state.search.filtered_indices = list.gen_picked();
                     matcher_tx
                         .send(MatcherCommand::PlaylistUpdate(list.clone()))
                         .ok();
                 }
 
-                if playlist.picked.as_deref().map_or(0, |p| p.len())
-                    != list.picked.as_deref().map_or(0, |p| p.len())
-                {
-                    ui_state.queue.move_to_start();
-                }
+                ui_state.queue.move_clamp(playlist.list_len());
                 drop(ui_state);
                 drop(playlist);
 
@@ -247,10 +248,8 @@ fn app(
                 force_render = force;
             }
             AppCommand::MoveListCursor(steps) => {
-                let index = state.ui_state.borrow().expand_index;
                 let mut ui_state = state.ui_state.borrow_mut();
-
-                let len = match CollapseWidgets::get(index) {
+                let len = match expand_widget {
                     CollapseWidgets::QueueList => {
                         let playlist = state.playlist.borrow();
                         Some(
@@ -284,9 +283,8 @@ fn app(
             }
             AppCommand::MoveSubCollapseCursor(steps) => {
                 let mut ui_state = state.ui_state.borrow_mut();
-                let index = ui_state.expand_index;
 
-                if matches!(CollapseWidgets::get(index), CollapseWidgets::TrackPicker) {
+                if matches!(expand_widget, CollapseWidgets::TrackPicker) {
                     force_render = true;
                     if steps > 0 {
                         ui_state.tracks.expand_index =
@@ -299,7 +297,7 @@ fn app(
             }
             AppCommand::SubmitItem => {
                 let ui_state = state.ui_state.borrow_mut();
-                match CollapseWidgets::get(ui_state.expand_index) {
+                match expand_widget {
                     CollapseWidgets::QueueList => {
                         let index = ui_state.queue.cursor_index;
                         player_tx
@@ -346,7 +344,7 @@ fn app(
             AppCommand::AppendItem => {
                 let ui_state = state.ui_state.borrow();
                 if matches!(
-                    CollapseWidgets::get(ui_state.expand_index),
+                    expand_widget,
                     CollapseWidgets::TrackPicker | CollapseWidgets::Search
                 ) {
                     let picked = ui_state.picked_playlist.borrow().iter().cloned().collect();
@@ -361,7 +359,7 @@ fn app(
             AppCommand::InsertItem => {
                 let ui_state = state.ui_state.borrow();
                 if matches!(
-                    CollapseWidgets::get(ui_state.expand_index),
+                    expand_widget,
                     CollapseWidgets::TrackPicker | CollapseWidgets::Search
                 ) {
                     let picked = ui_state.picked_playlist.borrow().iter().cloned().collect();
@@ -375,7 +373,7 @@ fn app(
             }
             AppCommand::SelectItem => {
                 let mut ui_state = state.ui_state.borrow_mut();
-                match CollapseWidgets::get(ui_state.expand_index) {
+                match expand_widget {
                     CollapseWidgets::TrackPicker => {
                         ui_state.tracks.pick();
                         force_render = true;
@@ -461,20 +459,15 @@ fn app(
             }
             AppCommand::UpdateFiltered(query, indices) => {
                 let mut ui_state = state.ui_state.borrow_mut();
-                if matches!(
-                    CollapseWidgets::get(ui_state.expand_index),
-                    CollapseWidgets::Search
-                ) && query == ui_state.search.input.value()
+                if matches!(expand_widget, CollapseWidgets::Search)
+                    && query == ui_state.search.input.value()
                 {
                     ui_state.search.filtered_indices = indices;
                     force_render = true;
                 }
             }
             AppCommand::RandomPlaylist => {
-                if matches!(
-                    CollapseWidgets::get(state.ui_state.borrow().expand_index),
-                    CollapseWidgets::QueueList
-                ) {
+                if matches!(expand_widget, CollapseWidgets::QueueList) {
                     let playlist = state.playlist.borrow();
                     let (mut picked, index): (Vec<usize>, usize) = if playlist.picked.is_none() {
                         let list = (0..playlist.list.len())
@@ -507,6 +500,30 @@ fn app(
                     picked.insert(0, index);
 
                     state.ui_state.borrow_mut().queue.move_to_start();
+                    player_tx
+                        .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Picked(
+                            picked,
+                        )))
+                        .ok();
+                }
+            }
+            AppCommand::RemoveFromPicked => {
+                if matches!(expand_widget, CollapseWidgets::QueueList) {
+                    let ui = state.ui_state.borrow();
+                    let playlist = state.playlist.borrow();
+                    let picked = match playlist.picked.as_deref() {
+                        Some(picked) => {
+                            let mut picked = picked.to_vec();
+                            picked.remove(ui.queue.cursor_index);
+                            picked
+                        }
+                        None => {
+                            let mut picked = playlist.gen_picked();
+                            picked.remove(ui.queue.cursor_index);
+                            picked
+                        }
+                    };
+
                     player_tx
                         .send(PlayerCommand::SetPickedPlaylist(PickedPlaylist::Picked(
                             picked,

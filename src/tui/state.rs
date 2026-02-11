@@ -109,6 +109,12 @@ pub trait CursorMovable {
     fn set_cursor_index(&mut self, index: usize);
     fn set_scroll_position(&mut self, position: usize);
 
+    fn move_clamp(&mut self, len: usize) {
+        let i = self.cursor_index().clamp(0, len.saturating_sub(1));
+        self.set_cursor_index(i);
+        self.set_scroll_position(i);
+    }
+
     fn move_to_start(&mut self) {
         self.set_cursor_index(0);
         self.set_scroll_position(0);
