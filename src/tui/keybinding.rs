@@ -20,181 +20,97 @@ fn handle_app_keypress(
     event: KeyEvent,
     mode: Arc<AtomicU8>,
 ) {
-    match event {
-        KeyEvent {
-            code: KeyCode::Char('q'),
-            ..
-        } => {
+    let KeyEvent {
+        code, modifiers, ..
+    } = event;
+
+    match code {
+        KeyCode::Char('q') => {
             tx.send(AppCommand::End).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char(' '),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char(' ') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::SelectItem).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char(' '),
-            ..
-        } => {
+        KeyCode::Char(' ') => {
             player_tx.send(PlayerCommand::PauseCycle).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('J'),
-            ..
-        } => {
+        KeyCode::Char('J') => {
             player_tx.send(PlayerCommand::SetRelatedVolume(-3)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('K'),
-            ..
-        } => {
+        KeyCode::Char('K') => {
             player_tx.send(PlayerCommand::SetRelatedVolume(3)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('j'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('j') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::MoveCollapseCursor(1)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('k'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('k') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::MoveCollapseCursor(-1)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('j'),
-            ..
-        } => {
+        KeyCode::Char('j') => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1)))
                 .ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('k'),
-            ..
-        } => {
+        KeyCode::Char('k') => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1)))
                 .ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('f'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('f') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Steps(10)))
                 .ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('b'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('b') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-10)))
                 .ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('d'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('d') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Steps(5)))
                 .ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('u'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('u') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-5)))
                 .ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('g'),
-            ..
-        } => {
+        KeyCode::Char('g') => {
             tx.send(AppCommand::MoveListCursor(CursorMove::Start)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('G'),
-            ..
-        } => {
+        KeyCode::Char('G') => {
             tx.send(AppCommand::MoveListCursor(CursorMove::End)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('l'),
-            ..
-        } => {
+        KeyCode::Char('l') => {
             tx.send(AppCommand::MoveSubCollapseCursor(1)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('h'),
-            ..
-        } => {
+        KeyCode::Char('h') => {
             tx.send(AppCommand::MoveSubCollapseCursor(-1)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('L'),
-            ..
-        } => {
+        KeyCode::Char('L') => {
             player_tx.send(PlayerCommand::NextSong).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('H'),
-            ..
-        } => {
+        KeyCode::Char('H') => {
             player_tx.send(PlayerCommand::PrevSong).ok();
         }
-        KeyEvent {
-            code: KeyCode::Enter,
-            ..
-        } => {
+        KeyCode::Enter => {
             tx.send(AppCommand::SubmitItem).ok();
         }
-        KeyEvent {
-            code: KeyCode::Tab, ..
-        } => {
+        KeyCode::Tab => {
             tx.send(AppCommand::SelectItem).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('a'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-        } => {
+        KeyCode::Char('a') if modifiers.contains(KeyModifiers::CONTROL) => {
             tx.send(AppCommand::AppendItem).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('i'),
-            ..
-        } => {
+        KeyCode::Char('i') => {
             tx.send(AppCommand::InsertItem).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('a'),
-            ..
-        } => {
+        KeyCode::Char('a') => {
             tx.send(AppCommand::TogglePickerMode).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('/'),
-            ..
-        } => {
+        KeyCode::Char('/') => {
             mode.store(KeyHandleMode::Edit as u8, atomic::Ordering::Relaxed);
             tx.send(AppCommand::Rerender(true)).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('r'),
-            ..
-        } => {
+        KeyCode::Char('r') => {
             tx.send(AppCommand::RandomPlaylist).ok();
         }
-        KeyEvent {
-            code: KeyCode::Char('x'),
-            ..
-        } => {
+        KeyCode::Char('x') => {
             tx.send(AppCommand::RemoveFromPicked).ok();
         }
         _ => {}
@@ -203,41 +119,40 @@ fn handle_app_keypress(
 
 fn handle_edit_keypress(tx: Sender<AppCommand>, event: Event, mode: Arc<AtomicU8>) {
     match event {
-        Event::Key(event) => match event {
-            KeyEvent {
-                code: KeyCode::Esc | KeyCode::Enter,
-                ..
-            } => {
-                mode.store(KeyHandleMode::App as u8, atomic::Ordering::Relaxed);
-                tx.send(AppCommand::Rerender(true)).ok();
+        Event::Key(key_event) => {
+            let KeyEvent {
+                code, modifiers, ..
+            } = key_event;
+
+            match code {
+                KeyCode::Esc | KeyCode::Enter => {
+                    mode.store(KeyHandleMode::App as u8, atomic::Ordering::Relaxed);
+                    tx.send(AppCommand::Rerender(true)).ok();
+                }
+                KeyCode::Char('n') if modifiers.contains(KeyModifiers::CONTROL) => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1)))
+                        .ok();
+                }
+                KeyCode::Char('p') if modifiers.contains(KeyModifiers::CONTROL) => {
+                    tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1)))
+                        .ok();
+                }
+                _ => {
+                    tx.send(AppCommand::EditEvent(Event::Key(key_event))).ok();
+                }
             }
-            KeyEvent {
-                code: KeyCode::Char('n'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            } => {
-                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(1)))
-                    .ok();
-            }
-            KeyEvent {
-                code: KeyCode::Char('p'),
-                modifiers: KeyModifiers::CONTROL,
-                ..
-            } => {
-                tx.send(AppCommand::MoveListCursor(CursorMove::Steps(-1)))
-                    .ok();
-            }
-            event => {
-                tx.send(AppCommand::EditEvent(Event::Key(event))).ok();
-            }
-        },
+        }
         event => {
             tx.send(AppCommand::EditEvent(event)).ok();
         }
     }
 }
 
-pub fn handle_keypress(tx: Sender<AppCommand>, player_tx: Sender<PlayerCommand>, mode: Arc<AtomicU8>) {
+pub fn handle_keypress(
+    tx: Sender<AppCommand>,
+    player_tx: Sender<PlayerCommand>,
+    mode: Arc<AtomicU8>,
+) {
     loop {
         let handle_mode = KeyHandleMode::from_repr(mode.load(atomic::Ordering::Relaxed));
 
