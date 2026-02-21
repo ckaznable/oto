@@ -57,14 +57,19 @@ sudo dnf install alsa-lib-devel dbus-devel chafa-devel
 
 ## Usage
 
+If you have configured `path` and `device` in `config.toml`, you can simply run:
+
+```bash
+oto tui
+```
+
+Otherwise, you can specify them via command-line arguments:
+
 ### TUI Mode (Interactive)
 
 ```bash
 # Play music from a directory
 oto tui --path /path/to/music
-
-# Use default device
-oto tui --path ~/Music
 
 # Specify audio device
 oto tui --path ~/Music --device hw:1,0
@@ -83,6 +88,33 @@ oto play --path /path/to/music
 # Download and build dictionary for Japanese track search
 oto init
 ```
+
+## Configuration
+
+OTO can be configured using a `config.toml` file. The configuration file should be placed in the following location:
+
+- **Linux**: `~/.config/oto/config.toml`
+
+### Example `config.toml`
+
+```toml
+# Default music directory
+path = "/path/to/your/music"
+
+# Default audio device (e.g., "hw:1,0")
+device = "hw:1,0"
+
+# Alternatively, specify device by name substring (e.g., "DAC")
+# OTO will search for the first device containing this name
+device_name = "USB DAC"
+```
+
+The search priority for the audio device is:
+1. CLI argument (`--device`)
+2. `device` field in `config.toml`
+3. `device_name` field in `config.toml`
+4. Automatically detected USB DACs
+5. Default ALSA device (`hw:0,0`)
 
 ## Audio Device Selection
 
