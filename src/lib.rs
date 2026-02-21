@@ -1,5 +1,6 @@
 pub mod alloc;
 pub mod cli;
+pub mod config;
 pub mod decoder;
 pub mod devices;
 pub mod event;

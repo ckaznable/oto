@@ -12,8 +12,9 @@ use alsa::pcm::State;
 use anyhow::Result;
 use clap::Parser;
 use oto::{
-    cli,
-    devices::{get_default_device, list_devices},
+    cli::{self, CommonArgs},
+    config::AppConfig,
+    devices::{get_default_device, get_device_with_name, list_devices},
     event::{AppCommand, MprisCommand, PickedPlaylist, PlayerCommand},
     mpris,
     player::{BufferPlayer, LastPlayerState, PlayerError},
@@ -44,7 +45,7 @@ impl PlayerEventLoopConfig {
 }
 
 fn main() -> Result<()> {
-    let args = cli::Args::parse();
+    let args = cli::CliArgs::parse();
 
     let (player_tx, player_rx) = channel();
     let (mpris_tx, mpris_rx) = channel();
@@ -68,7 +69,7 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        cli::Commands::Play { path, device } => {
+        cli::Commands::Play(CommonArgs { path, device }) => {
             spawn_mock_app_event_handler(app_rx);
             player_event_loop(
                 PlayerEventLoopConfig::new(path, device),
@@ -77,7 +78,7 @@ fn main() -> Result<()> {
                 player_rx,
             )
         }
-        cli::Commands::Tui { path, device } => {
+        cli::Commands::Tui(CommonArgs { path, device }) => {
             unsafe {
                 std::env::set_var("MALLOC_MMAP_THRESHOLD_", (1024 * 1024 * 2).to_string());
                 libc::mallopt(libc::M_MMAP_THRESHOLD, 1024 * 1024 * 2);
@@ -149,6 +150,7 @@ fn player_event_loop(
     mtx: Sender<MprisCommand>,
     rx: Receiver<PlayerCommand>,
 ) -> Result<()> {
+    let user_config = AppConfig::new();
     let devices = list_devices();
 
     let PlayerEventLoopConfig {
@@ -158,10 +160,15 @@ fn player_event_loop(
     } = config;
 
     let init_device = device
+        .or(user_config.device.clone())
+        .or_else(|| {
+            get_device_with_name(&devices, user_config.device_name.as_deref()?)
+                .map(|(p, d)| format!("hw:{p},{d}"))
+        })
         .or_else(|| get_default_device(&devices).map(|(p, d)| format!("hw:{p},{d}")))
         .unwrap_or_else(|| "hw:0,0".to_string());
 
-    let mut player = BufferPlayer::new(path, &init_device)?;
+    let mut player = BufferPlayer::new(path.or(user_config.path), &init_device)?;
     player.init()?;
 
     let init_spec = player.spec.unwrap();

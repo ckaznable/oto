@@ -6,11 +6,13 @@ use lofty::{
     probe::Probe,
     tag::Accessor,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
     rc::Rc,
+    time::SystemTime,
 };
 use walkdir::WalkDir;
 
@@ -78,9 +80,86 @@ impl TrackMeta {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MediaScanCache {
+    pub time: SystemTime,
+    pub path: PathBuf,
+}
+
+impl MediaScanCache {
+    pub fn new() -> Option<Self> {
+        std::fs::create_dir_all(PROJ_DIRS.data_dir()).ok()?;
+        let f = Self::file()?;
+        let cache: Self = serde_json::from_reader(f).ok()?;
+        Some(cache)
+    }
+
+    pub fn flush(p: impl Into<PathBuf>) -> Result<()> {
+        let path = p.into();
+        let meta = std::fs::metadata(&path)?;
+        let time = meta.modified()?;
+        let cache = Self { time, path };
+
+        let content = serde_json::to_string(&cache)?;
+        let mut f = Self::file().ok_or(anyhow::anyhow!("get cache file failed"))?;
+        f.write_all(content.as_bytes())?;
+
+        log::info!("write media scan cache");
+        Ok(())
+    }
+
+    fn file() -> Option<std::fs::File> {
+        let p = PROJ_DIRS.data_dir().join("scan_cache");
+        if p.exists() {
+            std::fs::File::open(p).ok()
+        } else {
+            std::fs::File::create(p).ok()
+        }
+    }
+}
+
 pub struct MediaStore;
 
 impl MediaStore {
+    pub fn get_tracks_with_cache(path: Option<&Path>) -> Tracks {
+        let cache = MediaScanCache::new();
+        let tracks = match cache {
+            Some(cache) => {
+                if path != Some(&cache.path) {
+                    log::info!("{:?} {:?}", path, cache.path);
+                    return Self::get_tracks(path);
+                }
+
+                let Some(path) = path else {
+                    log::info!("pataaaaaaaaaaa");
+                    return Self::get_tracks(path);
+                };
+
+                let Ok(meta) = std::fs::metadata(path) else {
+                    log::info!("patbbbbbbbbbbbbb");
+                    return Self::get_tracks(Some(path));
+                };
+
+                let Ok(time) = meta.modified() else {
+                    log::info!("modcccccccccccc");
+                    return Self::get_tracks(Some(path));
+                };
+
+                if time != cache.time {
+                    log::info!("media cache time diff");
+                    return Self::get_tracks(Some(path));
+                }
+
+                log::info!("media cache hit");
+                Self::load_tracks().unwrap_or_default()
+            }
+            _ => Self::get_tracks(path),
+        };
+
+        path.map(|p| MediaScanCache::flush(p).ok());
+        tracks
+    }
+
     pub fn get_tracks(path: Option<&Path>) -> Tracks {
         match path {
             Some(p) => {
@@ -272,7 +351,7 @@ impl MediaStore {
             artist: tag.artist().map(|a| a.to_string()),
             album: Album {
                 name: tag.album().map(|a| a.to_string()),
-                year: tag.year(),
+                year: tag.date().map(|d| d.year as u32),
                 track: tag.track(),
             },
             duration_secs: properties.duration().as_secs(),

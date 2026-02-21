@@ -49,6 +49,13 @@ impl Default for CardCapabilities {
     }
 }
 
+pub fn get_device_with_name(pcm: &[PlaybackPCM], name: &str) -> Option<(i32, i32)> {
+    pcm.iter()
+        .find(|p| p.long_name.as_deref() == Some(name) || p.name.as_deref() == Some(name))
+        .map(|p| p.get_default())
+        .or_else(|| pcm.first().map(|p| p.get_default()))
+}
+
 pub fn get_default_device(pcm: &[PlaybackPCM]) -> Option<(i32, i32)> {
     pcm.iter()
         .find(|p| p.caps.is_usb_dac)

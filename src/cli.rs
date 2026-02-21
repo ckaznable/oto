@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(version, long_about = None)]
-pub struct Args {
+pub struct CliArgs {
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -13,21 +13,17 @@ pub struct Args {
 pub enum Commands {
     #[cfg(feature = "dict-jp")]
     Init,
-    Play {
-        #[arg(short, long)]
-        path: Option<PathBuf>,
+    Play(CommonArgs),
+    Tui(CommonArgs),
+}
 
-        #[arg(short, long)]
-        device: Option<String>,
-    },
+#[derive(Args, Debug)]
+pub struct CommonArgs {
+    #[arg(short, long)]
+    pub path: Option<PathBuf>,
 
-    Tui {
-        #[arg(short, long)]
-        path: Option<PathBuf>,
-
-        #[arg(short, long)]
-        device: Option<String>,
-    },
+    #[arg(short, long)]
+    pub device: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]

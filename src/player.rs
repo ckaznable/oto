@@ -456,7 +456,7 @@ pub struct PlayList {
 impl PlayList {
     pub fn new(p: Option<PathBuf>) -> Self {
         Self {
-            list: Arc::new(MediaStore::get_tracks(p.as_deref())),
+            list: Arc::new(MediaStore::get_tracks_with_cache(p.as_deref())),
             picked: Arc::new(None),
             index: 0,
         }
