@@ -170,9 +170,9 @@ pub struct BufferPlayer {
     rb: LocalRb<Heap<i32>>,
     buf: VecDeque<i32>,
     decoder: MixDecoder,
-    eof: bool,
     written_sample_count: u64,
     last_state: Option<LastPlayerState>,
+    pub eof: bool,
     pub playlist: PlayList,
     pub spec: Option<MediaSpec>,
 }
@@ -248,6 +248,7 @@ impl BufferPlayer {
         self.inner.drop()?;
         self.open(track)?;
         self.inner.prepare()?;
+        self.eof = false;
         Ok(())
     }
 

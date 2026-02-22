@@ -324,7 +324,7 @@ fn player_event_loop(
             }
         }
 
-        if matches!(player.state(), State::Paused) {
+        if matches!(player.state(), State::Paused) || player.eof {
             std::thread::sleep(std::time::Duration::from_millis(100));
             continue;
         }
@@ -348,7 +348,7 @@ fn player_event_loop(
         .ok();
 
         if let Err(PlayerError::EOF) = player.consume() {
-            break;
+            continue;
         }
 
         match player.pop_state() {
@@ -394,6 +394,4 @@ fn player_event_loop(
             init = true;
         }
     }
-
-    Ok(())
 }
