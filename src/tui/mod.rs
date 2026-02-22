@@ -171,13 +171,15 @@ fn app(
 
     let mut rng = rand::rng();
 
+    let mut unexpected = None;
+
     // first draw
     terminal.draw(enclose!((state) move |f| render(f, state)))?;
 
     loop {
         let event = match rx.recv() {
             Ok(e) => e,
-            Err(_) => break Ok(()),
+            Err(_) => break,
         };
 
         let mut force_render = false;
@@ -185,8 +187,11 @@ fn app(
         let expand_widget = state.expand_widget();
         match event {
             AppCommand::Err(e) => log::error!("{e}"),
-            AppCommand::Unexcepted(e) => log::error!("{e}"),
-            AppCommand::End => break Ok(()),
+            AppCommand::Unexcepted(e) => {
+                unexpected = Some(e);
+                break;
+            },
+            AppCommand::End => break,
             AppCommand::TimeUpdate(current, duration) => {
                 state.app_mode.set(AppMode::Playing);
                 state.playing.set(PlayingState {
@@ -538,6 +543,13 @@ fn app(
             timer = Instant::now();
         }
     }
+
+    ratatui::restore();
+    if let Some(e) = unexpected {
+        println!("{e}");
+    }
+
+    Ok(())
 }
 
 struct MatcherItem<'a> {
