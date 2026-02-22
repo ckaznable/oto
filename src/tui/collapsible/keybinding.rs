@@ -7,7 +7,7 @@ use crate::tui::{
 
 pub struct KeyBinding;
 
-pub const BINDINGS: [(&str, &str); 25] = [
+pub const BINDINGS: [(&str, &str); 26] = [
     ("<Space>", "Play / Pause"),
     ("H", "Previous track"),
     ("L", "Next track"),
@@ -32,6 +32,7 @@ pub const BINDINGS: [(&str, &str); 25] = [
     ("<c-b>", "Page up"),
     ("<c-d>", "Half page down"),
     ("<c-u>", "Half page up"),
+    ("r", "Random queue"),
     ("q", "Quit"),
 ];
 
